@@ -12,6 +12,7 @@ const AUTO_CONFIRM_MS = 3000;
 
 export function HandoffModal({ status }: Props) {
   const actingSide = status.pending_handoff;
+  const cancelDisabled = status.pending_attack;
 
   useEffect(() => {
     if (!actingSide) return;
@@ -35,7 +36,13 @@ export function HandoffModal({ status }: Props) {
           <button type="button" className="handoff-modal__confirm" onClick={() => api.confirmHandoff()}>
             Übergeben
           </button>
-          <button type="button" className="handoff-modal__cancel" onClick={() => api.cancelHandoff()}>
+          <button
+            type="button"
+            className="handoff-modal__cancel"
+            disabled={cancelDisabled}
+            title={cancelDisabled ? "Ein Angriff kann nicht rückgängig gemacht werden" : undefined}
+            onClick={() => api.cancelHandoff()}
+          >
             Ich überlege noch einmal
           </button>
         </div>

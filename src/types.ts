@@ -77,6 +77,7 @@ export type PhaseDto =
 export type StatusDto = {
   phase: PhaseDto;
   pending_handoff: Side | null;
+  pending_attack: boolean;
 };
 
 export type Pos = { row: number; col: number };

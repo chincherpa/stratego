@@ -33,6 +33,9 @@ type Props = {
   /** Display preference: when false, mask permanently-revealed enemy pieces
    * back to hidden card-backs (outside the live combat-banner square). */
   permanentRevealEnabled: boolean;
+  /** Opens the (shared, global) settings modal — both halves' gear buttons
+   * trigger the same dialog so either player can reach it from their seat. */
+  onOpenSettings: () => void;
 };
 
 const BOARD_SIZE = 10;
@@ -99,7 +102,7 @@ function toCanonical(side: Side, displayRow: number, displayCol: number): Pos {
   return { row: BOARD_SIZE - 1 - displayRow, col: BOARD_SIZE - 1 - displayCol };
 }
 
-export function BoardPanel({ side, view, status, combat, permanentRevealEnabled }: Props) {
+export function BoardPanel({ side, view, status, combat, permanentRevealEnabled, onOpenSettings }: Props) {
   const [selectedRank, setSelectedRank] = useState<Rank | null>(null);
   const [selectedFrom, setSelectedFrom] = useState<Pos | null>(null);
   /** Setup-phase only: a piece already on the board, picked up so it can be
@@ -263,6 +266,15 @@ export function BoardPanel({ side, view, status, combat, permanentRevealEnabled 
       }`}
     >
       <header className="board-panel__header">
+        <button
+          type="button"
+          className="settings-button"
+          title="Einstellungen"
+          aria-label="Einstellungen"
+          onClick={onOpenSettings}
+        >
+          ⚙
+        </button>
         <h2>Team {side === "Blue" ? "Blau" : "Rot"}</h2>
         <p className="board-panel__status">{describeStatus(status, side)}</p>
       </header>

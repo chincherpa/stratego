@@ -18,6 +18,7 @@ pub enum ActionError {
     WrongPhase,
     HandoffPending,
     NoPendingHandoff,
+    CannotCancelAttack,
     SetupIncomplete,
     Placement(PlaceError),
     Move(MoveError),
@@ -79,6 +80,10 @@ pub struct CombatResultDto {
 pub struct StatusDto {
     pub phase: PhaseDto,
     pub pending_handoff: Option<Side>,
+    /// `true` when the pending handoff was triggered by an attack (a move
+    /// onto an occupied square) — the frontend disables "Ich überlege noch
+    /// einmal" in that case, since combat outcomes can't be taken back.
+    pub pending_attack: bool,
 }
 
 pub struct GameState {
@@ -90,6 +95,10 @@ pub struct GameState {
     /// Side whose action is awaiting confirmation (drives which popup shows
     /// and which side regains control on "Ich überlege noch einmal").
     pending_handoff: Option<Side>,
+    /// Whether the pending handoff resulted from an attack (combat), as
+    /// opposed to a plain move or finishing setup. Combat can't be undone,
+    /// so [`cancel_handoff`](Self::cancel_handoff) refuses while this is set.
+    pending_attack: bool,
     /// Board snapshot taken right before the pending action was applied,
     /// restored verbatim on cancel.
     undo_snapshot: Option<Board>,
@@ -102,6 +111,7 @@ impl GameState {
             phase: Phase::SetupBlue,
             pending_transition: None,
             pending_handoff: None,
+            pending_attack: false,
             undo_snapshot: None,
         }
     }
@@ -110,6 +120,7 @@ impl GameState {
         StatusDto {
             phase: self.phase.into(),
             pending_handoff: self.pending_handoff,
+            pending_attack: self.pending_attack,
         }
     }
 
@@ -233,6 +244,7 @@ impl GameState {
         self.undo_snapshot = Some(self.board.clone());
         self.pending_transition = Some(next);
         self.pending_handoff = Some(side);
+        self.pending_attack = false;
         Ok(())
     }
 
@@ -294,6 +306,7 @@ impl GameState {
         } else {
             self.pending_transition = Some(next_phase);
             self.pending_handoff = Some(side);
+            self.pending_attack = combat_result.is_some();
         }
         Ok(combat_result)
     }
@@ -336,6 +349,12 @@ impl GameState {
     /// hands control straight back to the side that just acted (no phase
     /// change, no cursor jump).
     pub fn cancel_handoff(&mut self) -> Result<Side, ActionError> {
+        if self.pending_handoff.is_none() {
+            return Err(ActionError::NoPendingHandoff);
+        }
+        if self.pending_attack {
+            return Err(ActionError::CannotCancelAttack);
+        }
         let acting_side = self
             .pending_handoff
             .take()

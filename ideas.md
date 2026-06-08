@@ -16,12 +16,10 @@ FIXED: Team Blau wird im Screen von Spieler Rot aktuell in rot dargestellt
 
 pop-up nicht in der mitte
 
-settings fehlt
-
 "nochmal überlegen" macht verlust rückgängig
 
-Spielbrett größer
+FIXED: Spielbrett größer
 
-Settings-Button auf beiden Hälften, gleiche Funktion
+FIXED: Settings-Button auf beiden Hälften, gleiche Funktion
 
 

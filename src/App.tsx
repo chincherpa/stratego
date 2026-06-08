@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { api } from "./api";
 import { BoardPanel } from "./components/BoardPanel";
 import { HandoffModal } from "./components/HandoffModal";
@@ -11,6 +11,7 @@ import "./App.css";
 function App() {
   const { status, blueView, redView, activeCombat } = useGame();
   const { settings, setHandoffPopupEnabled, setPermanentRevealEnabled } = useSettings();
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // When the handover popup is disabled, skip the confirmation step entirely —
   // confirm the instant a handoff becomes pending, same as if the player had
@@ -31,6 +32,8 @@ function App() {
   return (
     <main className="app">
       <SettingsPanel
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
         handoffPopupEnabled={settings.handoffPopupEnabled}
         permanentRevealEnabled={settings.permanentRevealEnabled}
         onToggleHandoffPopup={setHandoffPopupEnabled}
@@ -43,6 +46,7 @@ function App() {
           status={status}
           combat={activeCombat}
           permanentRevealEnabled={settings.permanentRevealEnabled}
+          onOpenSettings={() => setSettingsOpen(true)}
         />
         <div className="app__divider" title="Hier den Pappkarton aufkleben" />
         <BoardPanel
@@ -51,6 +55,7 @@ function App() {
           status={status}
           combat={activeCombat}
           permanentRevealEnabled={settings.permanentRevealEnabled}
+          onOpenSettings={() => setSettingsOpen(true)}
         />
       </div>
       {/* Held back until the clash banner finishes — otherwise the popup,
