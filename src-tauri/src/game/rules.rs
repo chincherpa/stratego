@@ -9,7 +9,9 @@ pub enum MoveError {
     NoPieceAtSource,
     NotOwnPiece,
     PieceIsStatic,
-    NotOrthogonalSingleStep,
+    InvalidDirection,
+    TooFar,
+    PathBlocked,
     DestinationIsLake,
     DestinationOccupiedByOwnPiece,
 }
@@ -30,8 +32,11 @@ pub enum CombatOutcome {
     FlagCaptured,
 }
 
-/// v1 movement rules: orthogonal, exactly one square, no diagonals,
-/// can't land on water, can't land on own piece, Bombs/Flag never move.
+/// Movement rules: orthogonal, no diagonals, can't land on water, can't land
+/// on own piece, Bombs/Flag never move. Every piece may step exactly one
+/// square — except the Scout, which may run any distance along a clear,
+/// straight, unobstructed lane (rook-style), capturing only the piece it
+/// finally lands on.
 pub fn validate_move(board: &Board, side: Side, from: Pos, to: Pos) -> Result<(), MoveError> {
     if !Board::in_bounds(from.0 as isize, from.1 as isize)
         || !Board::in_bounds(to.0 as isize, to.1 as isize)
@@ -50,10 +55,28 @@ pub fn validate_move(board: &Board, side: Side, from: Pos, to: Pos) -> Result<()
         return Err(MoveError::PieceIsStatic);
     }
 
-    let row_delta = (to.0 as isize - from.0 as isize).abs();
-    let col_delta = (to.1 as isize - from.1 as isize).abs();
-    if !((row_delta == 1 && col_delta == 0) || (row_delta == 0 && col_delta == 1)) {
-        return Err(MoveError::NotOrthogonalSingleStep);
+    let row_delta = to.0 as isize - from.0 as isize;
+    let col_delta = to.1 as isize - from.1 as isize;
+    let is_horizontal = row_delta == 0 && col_delta != 0;
+    let is_vertical = col_delta == 0 && row_delta != 0;
+    if !is_horizontal && !is_vertical {
+        return Err(MoveError::InvalidDirection);
+    }
+
+    let distance = row_delta.abs().max(col_delta.abs());
+    if distance > 1 {
+        if piece.rank != Rank::Scout {
+            return Err(MoveError::TooFar);
+        }
+        let row_step = row_delta.signum();
+        let col_step = col_delta.signum();
+        for step in 1..distance {
+            let r = (from.0 as isize + row_step * step) as usize;
+            let c = (from.1 as isize + col_step * step) as usize;
+            if board.get((r, c)) != Square::Empty {
+                return Err(MoveError::PathBlocked);
+            }
+        }
     }
 
     match board.get(to) {
@@ -65,10 +88,20 @@ pub fn validate_move(board: &Board, side: Side, from: Pos, to: Pos) -> Result<()
     }
 }
 
-/// Higher rank wins; equal ranks destroy each other; capturing the Flag ends the game.
+/// Higher rank wins; equal ranks destroy each other; capturing the Flag ends
+/// the game. Two special-case overrides apply before the strength comparison:
+/// a Spy attacking the Marshal assassinates it (but loses normally if the
+/// Marshal attacks first), and a Miner attacking a Bomb defuses it instead of
+/// being blown up.
 pub fn resolve_combat(attacker: Rank, defender: Rank) -> CombatOutcome {
     if defender == Rank::Flag {
         return CombatOutcome::FlagCaptured;
+    }
+    if attacker == Rank::Spy && defender == Rank::Marshal {
+        return CombatOutcome::AttackerWins;
+    }
+    if attacker == Rank::Miner && defender == Rank::Bomb {
+        return CombatOutcome::AttackerWins;
     }
     let (a, d) = (attacker.strength(), defender.strength());
     if a > d {
@@ -163,15 +196,58 @@ mod tests {
     }
 
     #[test]
-    fn rejects_diagonal_and_multi_step() {
+    fn rejects_diagonal_movement() {
         let b = board_with(&[((6, 5), Side::Blue, Rank::Scout)]);
         assert_eq!(
             validate_move(&b, Side::Blue, (6, 5), (5, 4)),
-            Err(MoveError::NotOrthogonalSingleStep)
+            Err(MoveError::InvalidDirection)
         );
+    }
+
+    #[test]
+    fn rejects_multi_step_for_non_scout() {
+        let b = board_with(&[((6, 5), Side::Blue, Rank::Miner)]);
         assert_eq!(
-            validate_move(&b, Side::Blue, (6, 5), (8, 5)),
-            Err(MoveError::NotOrthogonalSingleStep)
+            validate_move(&b, Side::Blue, (6, 5), (4, 5)),
+            Err(MoveError::TooFar)
+        );
+    }
+
+    #[test]
+    fn scout_runs_multiple_squares_along_clear_lane() {
+        let b = board_with(&[((9, 0), Side::Blue, Rank::Scout)]);
+        assert_eq!(validate_move(&b, Side::Blue, (9, 0), (6, 0)), Ok(()));
+    }
+
+    #[test]
+    fn scout_path_blocked_by_intervening_piece() {
+        let b = board_with(&[
+            ((9, 0), Side::Blue, Rank::Scout),
+            ((7, 0), Side::Blue, Rank::Miner),
+        ]);
+        assert_eq!(
+            validate_move(&b, Side::Blue, (9, 0), (6, 0)),
+            Err(MoveError::PathBlocked)
+        );
+    }
+
+    #[test]
+    fn scout_can_capture_at_end_of_run() {
+        let b = board_with(&[
+            ((9, 0), Side::Blue, Rank::Scout),
+            ((6, 0), Side::Red, Rank::Miner),
+        ]);
+        assert_eq!(validate_move(&b, Side::Blue, (9, 0), (6, 0)), Ok(()));
+    }
+
+    #[test]
+    fn scout_cannot_run_through_a_lake() {
+        let b = board_with(&[((9, 2), Side::Blue, Rank::Scout)]);
+        // Column 2 has lake cells at rows 4 and 5 — the run from row 9 to
+        // row 3 must pass through them.
+        assert_eq!(
+            validate_move(&b, Side::Blue, (9, 2), (3, 2)),
+            Err(MoveError::PathBlocked)
         );
     }
 
@@ -218,12 +294,25 @@ mod tests {
     #[test]
     fn combat_higher_rank_wins() {
         assert_eq!(
-            resolve_combat(Rank::Marshal, Rank::Spy),
+            resolve_combat(Rank::Marshal, Rank::Colonel),
             CombatOutcome::AttackerWins
         );
         assert_eq!(
-            resolve_combat(Rank::Spy, Rank::Marshal),
+            resolve_combat(Rank::Colonel, Rank::Marshal),
             CombatOutcome::DefenderWins
+        );
+    }
+
+    #[test]
+    fn spy_assassinates_marshal_only_when_attacking() {
+        assert_eq!(
+            resolve_combat(Rank::Spy, Rank::Marshal),
+            CombatOutcome::AttackerWins
+        );
+        // Marshal still wins normally when it's the one attacking the Spy.
+        assert_eq!(
+            resolve_combat(Rank::Marshal, Rank::Spy),
+            CombatOutcome::AttackerWins
         );
     }
 
@@ -236,10 +325,18 @@ mod tests {
     }
 
     #[test]
-    fn combat_bomb_always_wins_as_defender_in_v1() {
+    fn combat_bomb_defeats_non_miner_attackers() {
         assert_eq!(
             resolve_combat(Rank::Marshal, Rank::Bomb),
             CombatOutcome::DefenderWins
+        );
+    }
+
+    #[test]
+    fn miner_defuses_bomb() {
+        assert_eq!(
+            resolve_combat(Rank::Miner, Rank::Bomb),
+            CombatOutcome::AttackerWins
         );
     }
 

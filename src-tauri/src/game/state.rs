@@ -200,9 +200,9 @@ impl GameState {
         Ok(())
     }
 
-    /// Scatters every rank `side` hasn't placed yet across its still-empty
-    /// home-row squares (lakes and already-occupied squares excluded), so a
-    /// player can skip manual placement entirely or fill in whatever's left.
+    /// Clears every piece `side` has on its home rows and re-scatters the
+    /// full set across them at random, so repeated clicks keep reshuffling
+    /// into a fresh layout rather than only filling in whatever's left.
     pub fn random_setup(&mut self, side: Side) -> Result<(), ActionError> {
         self.expect_no_pending()?;
         let expected = match side {
@@ -213,8 +213,17 @@ impl GameState {
             return Err(ActionError::WrongPhase);
         }
 
-        let mut empties: Vec<Pos> = Board::home_rows(side)
+        let home: Vec<Pos> = Board::home_rows(side)
             .flat_map(|row| (0..super::board::SIZE).map(move |col| (row, col)))
+            .collect();
+        for &pos in &home {
+            if matches!(self.board.get(pos), Square::Occupied(p) if p.owner == side) {
+                self.board.set(pos, Square::Empty);
+            }
+        }
+
+        let mut empties: Vec<Pos> = home
+            .into_iter()
             .filter(|&pos| matches!(self.board.get(pos), Square::Empty))
             .collect();
         let mut ranks = rules::remaining_ranks(&self.board, side);

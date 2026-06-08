@@ -79,17 +79,26 @@ function isHomeRow(side: Side, pos: Pos): boolean {
 
 /** Squares this side's piece at `from` could legally move onto, judged purely
  * from what's visible on the board (no hidden info needed: empty / enemy /
- * own-occupied / lake are all observable). The backend re-validates anyway. */
-function legalTargets(view: BoardView, side: Side, from: Pos): Pos[] {
+ * own-occupied / lake are all observable). The backend re-validates anyway.
+ * Scouts run any distance along a clear straight lane (rook-style) and may
+ * only capture the piece they finally land on, so each direction is walked
+ * until something blocks it. */
+function legalTargets(view: BoardView, side: Side, from: Pos, rank: Rank | null): Pos[] {
   const targets: Pos[] = [];
+  const reach = rank === "Scout" ? BOARD_SIZE : 1;
   for (const [dr, dc] of NEIGHBOR_DELTAS) {
-    const row = from.row + dr;
-    const col = from.col + dc;
-    if (row < 0 || row >= BOARD_SIZE || col < 0 || col >= BOARD_SIZE) continue;
-    const square = view[row][col];
-    if (square.kind === "Lake") continue;
-    if (square.kind === "Piece" && square.owner === side) continue;
-    targets.push({ row, col });
+    for (let step = 1; step <= reach; step++) {
+      const row = from.row + dr * step;
+      const col = from.col + dc * step;
+      if (row < 0 || row >= BOARD_SIZE || col < 0 || col >= BOARD_SIZE) break;
+      const square = view[row][col];
+      if (square.kind === "Lake") break;
+      if (square.kind === "Piece") {
+        if (square.owner !== side) targets.push({ row, col });
+        break;
+      }
+      targets.push({ row, col });
+    }
   }
   return targets;
 }
@@ -118,7 +127,9 @@ export function BoardPanel({ side, view, status, combat, permanentRevealEnabled,
   const isSetupPhase = phase.kind === "SetupBlue" || phase.kind === "SetupRed";
   const interactive = status.pending_handoff === null && sideInControl(status) === side;
 
-  const targets = selectedFrom ? legalTargets(view, side, selectedFrom) : [];
+  const movingSquare = selectedFrom ? view[selectedFrom.row][selectedFrom.col] : null;
+  const movingRank = movingSquare && movingSquare.kind === "Piece" ? movingSquare.rank : null;
+  const targets = selectedFrom ? legalTargets(view, side, selectedFrom, movingRank) : [];
   const markedSquare = markedPos ? view[markedPos.row][markedPos.col] : null;
   const markedRank = markedSquare && markedSquare.kind === "Piece" ? markedSquare.rank : null;
   const highlightedFrom = isSetupPhase ? markedPos : selectedFrom;

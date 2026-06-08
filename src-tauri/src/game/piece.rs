@@ -32,8 +32,11 @@ pub enum Rank {
 }
 
 impl Rank {
-    /// v1 combat strength: higher wins. Bomb is treated as unbeatable defender,
-    /// Flag ends the game on capture (handled separately in combat resolution).
+    /// Baseline combat strength: higher wins on a plain comparison. Bomb sits
+    /// above every attacker (only a Miner defuses it) and Flag ends the game
+    /// on capture — both exceptions, plus the Spy-vs-Marshal assassination,
+    /// are special-cased in [`resolve_combat`](super::rules::resolve_combat)
+    /// rather than expressed through these numbers.
     pub fn strength(self) -> u8 {
         use Rank::*;
         match self {
