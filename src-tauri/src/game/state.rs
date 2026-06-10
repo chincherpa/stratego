@@ -76,6 +76,16 @@ pub struct CombatResultDto {
     pub outcome: CombatOutcome,
 }
 
+/// `last_move` flattened for the frontend (Pos tuples would serialize as
+/// arrays, which is awkward to type on the TS side).
+#[derive(Serialize, Clone, Copy, Debug)]
+pub struct LastMoveDto {
+    pub from_row: usize,
+    pub from_col: usize,
+    pub to_row: usize,
+    pub to_col: usize,
+}
+
 #[derive(Serialize, Clone, Debug)]
 pub struct StatusDto {
     pub phase: PhaseDto,
@@ -84,6 +94,7 @@ pub struct StatusDto {
     /// onto an occupied square) — the frontend disables "Ich überlege noch
     /// einmal" in that case, since combat outcomes can't be taken back.
     pub pending_attack: bool,
+    pub last_move: Option<LastMoveDto>,
 }
 
 /// Everything `cancel_handoff` ("Ich überlege noch einmal") must restore.
@@ -92,6 +103,7 @@ pub struct StatusDto {
 #[derive(Clone)]
 struct UndoSnapshot {
     board: Board,
+    last_move: Option<(Pos, Pos)>,
 }
 
 pub struct GameState {
@@ -110,6 +122,9 @@ pub struct GameState {
     /// Snapshot taken right before the pending action was applied,
     /// restored verbatim on cancel.
     undo_snapshot: Option<UndoSnapshot>,
+    /// From/to of the most recent executed move, shown to both players
+    /// (movement is public information in Stratego).
+    last_move: Option<(Pos, Pos)>,
 }
 
 impl GameState {
@@ -121,6 +136,7 @@ impl GameState {
             pending_handoff: None,
             pending_attack: false,
             undo_snapshot: None,
+            last_move: None,
         }
     }
 
@@ -129,6 +145,12 @@ impl GameState {
             phase: self.phase.into(),
             pending_handoff: self.pending_handoff,
             pending_attack: self.pending_attack,
+            last_move: self.last_move.map(|(from, to)| LastMoveDto {
+                from_row: from.0,
+                from_col: from.1,
+                to_row: to.0,
+                to_col: to.1,
+            }),
         }
     }
 
@@ -143,6 +165,7 @@ impl GameState {
     fn take_snapshot(&mut self) {
         self.undo_snapshot = Some(UndoSnapshot {
             board: self.board.clone(),
+            last_move: self.last_move,
         });
     }
 
@@ -306,6 +329,8 @@ impl GameState {
             }
         };
 
+        self.last_move = Some((from, to));
+
         let flag_captured = matches!(
             combat_result,
             Some(CombatResultDto { outcome: CombatOutcome::FlagCaptured, .. })
@@ -384,6 +409,7 @@ impl GameState {
             .ok_or(ActionError::NoPendingHandoff)?;
         if let Some(snapshot) = self.undo_snapshot.take() {
             self.board = snapshot.board;
+            self.last_move = snapshot.last_move;
         }
         self.pending_transition = None;
         Ok(acting_side)
@@ -445,7 +471,6 @@ mod tests {
 
     /// A board where both sides always keep a legal move (no accidental
     /// stalemate-loss): one Miner and one Scout each, far apart.
-    #[allow(dead_code)]
     fn two_movers() -> GameState {
         playing_with(&[
             ((9, 0), Side::Blue, Rank::Miner),
@@ -457,12 +482,31 @@ mod tests {
 
     /// Makes a move and clicks through the handoff popup (game-ending moves
     /// skip the handoff, so confirm only when one is pending).
-    #[allow(dead_code)]
     fn move_and_confirm(gs: &mut GameState, side: Side, from: Pos, to: Pos) {
         gs.make_move(side, from, to).expect("move should be legal");
         if gs.pending_handoff.is_some() {
             gs.confirm_handoff().expect("confirm_handoff");
         }
+    }
+
+    #[test]
+    fn last_move_tracks_most_recent_move() {
+        let mut gs = two_movers();
+        assert_eq!(gs.last_move, None);
+        move_and_confirm(&mut gs, Side::Blue, (9, 0), (8, 0));
+        assert_eq!(gs.last_move, Some(((9, 0), (8, 0))));
+        move_and_confirm(&mut gs, Side::Red, (0, 0), (1, 0));
+        assert_eq!(gs.last_move, Some(((0, 0), (1, 0))));
+    }
+
+    #[test]
+    fn cancel_handoff_restores_last_move() {
+        let mut gs = two_movers();
+        move_and_confirm(&mut gs, Side::Blue, (9, 0), (8, 0));
+        // Red moves but reconsiders.
+        gs.make_move(Side::Red, (0, 0), (1, 0)).unwrap();
+        gs.cancel_handoff().unwrap();
+        assert_eq!(gs.last_move, Some(((9, 0), (8, 0))));
     }
 
     #[test]
