@@ -3,6 +3,7 @@ import { Square } from "./Square";
 import { countOwnByRank, SetupTray } from "./SetupTray";
 import { api } from "../api";
 import { RANK_COUNT, type BoardView, type CombatResult, type Pos, type Rank, type Side, type StatusDto, type SquareView } from "../types";
+import { CapturedTray } from "./CapturedTray";
 
 /** Setup auto-pick queue: flag first (most critical to place well), then
  * bombs, then combat ranks ascending by strength (Spy·1 … Marshal·10) so
@@ -291,6 +292,10 @@ export function BoardPanel({ side, view, status, combat, permanentRevealEnabled,
       </header>
 
       <div className="board-grid">{rows}</div>
+
+      {!isSetupPhase && (
+        <CapturedTray capturedBlue={status.captured_blue} capturedRed={status.captured_red} />
+      )}
 
       {error && <p className="board-panel__error">{error}</p>}
 
