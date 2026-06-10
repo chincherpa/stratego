@@ -38,6 +38,10 @@ function App() {
         permanentRevealEnabled={settings.permanentRevealEnabled}
         onToggleHandoffPopup={setHandoffPopupEnabled}
         onTogglePermanentReveal={setPermanentRevealEnabled}
+        onNewGame={() => {
+          api.newGame();
+          setSettingsOpen(false);
+        }}
       />
       <div className="app__panels">
         <BoardPanel

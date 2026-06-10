@@ -623,3 +623,39 @@ button {
 .square--last-to:not(.square--selected) {
   box-shadow: inset 0 0 0 3px rgba(255, 200, 60, 0.85);
 }
+
+/* --- Neue Partie (settings) --- */
+.settings-newgame {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-newgame__start,
+.settings-newgame__confirm {
+  border: 1px solid rgba(255, 90, 90, 0.6);
+  color: rgb(255, 140, 140);
+  background: transparent;
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.settings-newgame__confirm:hover,
+.settings-newgame__start:hover {
+  background: rgba(255, 90, 90, 0.15);
+}
+
+.settings-newgame__warning {
+  margin: 0;
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
+.settings-newgame__buttons {
+  display: flex;
+  gap: 8px;
+}

@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+
 type Props = {
   open: boolean;
   onClose: () => void;
@@ -5,6 +7,7 @@ type Props = {
   permanentRevealEnabled: boolean;
   onToggleHandoffPopup: (next: boolean) => void;
   onTogglePermanentReveal: (next: boolean) => void;
+  onNewGame: () => void;
 };
 
 export function SettingsPanel({
@@ -14,7 +17,16 @@ export function SettingsPanel({
   permanentRevealEnabled,
   onToggleHandoffPopup,
   onTogglePermanentReveal,
+  onNewGame,
 }: Props) {
+  // Two-step confirm so a single misclick (or one frustrated player) can't
+  // wipe the running game. Re-arms whenever the panel closes.
+  const [confirmingNewGame, setConfirmingNewGame] = useState(false);
+
+  useEffect(() => {
+    if (!open) setConfirmingNewGame(false);
+  }, [open]);
+
   if (!open) return null;
 
   return (
@@ -48,6 +60,25 @@ export function SettingsPanel({
             </small>
           </span>
         </label>
+        <div className="settings-newgame">
+          {!confirmingNewGame ? (
+            <button type="button" className="settings-newgame__start" onClick={() => setConfirmingNewGame(true)}>
+              Neue Partie
+            </button>
+          ) : (
+            <>
+              <p className="settings-newgame__warning">Wirklich neu starten? Aktuelle Partie geht verloren.</p>
+              <div className="settings-newgame__buttons">
+                <button type="button" className="settings-newgame__confirm" onClick={onNewGame}>
+                  Ja, neue Partie
+                </button>
+                <button type="button" onClick={() => setConfirmingNewGame(false)}>
+                  Abbrechen
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
