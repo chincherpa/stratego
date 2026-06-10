@@ -37,6 +37,7 @@ pub fn run() {
             commands::make_move,
             commands::confirm_handoff,
             commands::cancel_handoff,
+            commands::new_game,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

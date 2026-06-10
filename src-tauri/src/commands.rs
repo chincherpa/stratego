@@ -180,3 +180,11 @@ pub fn cancel_handoff(window: WebviewWindow, state: State<AppState>) -> Result<(
     }
     result
 }
+
+/// "Neue Partie": full reset to a fresh SetupBlue. No preconditions — works
+/// in any phase, including while a handoff popup is pending.
+#[tauri::command]
+pub fn new_game(window: WebviewWindow, state: State<AppState>) {
+    state.0.lock().unwrap().reset();
+    notify(&window);
+}

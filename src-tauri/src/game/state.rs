@@ -165,6 +165,13 @@ impl GameState {
         }
     }
 
+    /// "Neue Partie": throws everything away and starts over at Blue's setup.
+    /// Deliberately has no preconditions — allowed mid-game and even while a
+    /// handoff is pending (the reset clears that too).
+    pub fn reset(&mut self) {
+        *self = GameState::new();
+    }
+
     pub fn status(&self) -> StatusDto {
         StatusDto {
             phase: self.phase.into(),
@@ -711,5 +718,23 @@ mod tests {
         gs.make_move(Side::Blue, (8, 0), (9, 0)).unwrap();
         gs.cancel_handoff().unwrap();
         assert_eq!(gs.shuttle_blue, Some(Shuttle { a: (9, 0), b: (8, 0), count: 1 }));
+    }
+
+    #[test]
+    fn reset_returns_to_fresh_setup() {
+        let mut gs = combat_board(Rank::Marshal, Rank::Miner);
+        // Mutate everything: a capture fills captured_red, sets last_move,
+        // shuttle, and leaves a handoff pending.
+        gs.make_move(Side::Blue, (5, 0), (4, 0)).unwrap();
+        gs.reset();
+        assert_eq!(gs.phase, Phase::SetupBlue);
+        assert_eq!(gs.last_move, None);
+        assert!(gs.captured_blue.is_empty());
+        assert!(gs.captured_red.is_empty());
+        assert_eq!(gs.shuttle_blue, None);
+        assert!(gs.pending_handoff.is_none());
+        assert!(gs.status().pending_handoff.is_none());
+        // Board is empty again (4,0 held the winning Marshal).
+        assert_eq!(gs.board.get((4, 0)), Square::Empty);
     }
 }
