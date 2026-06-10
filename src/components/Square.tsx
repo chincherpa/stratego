@@ -8,6 +8,9 @@ type Props = {
   panelSide: Side;
   selected: boolean;
   legalTarget: boolean;
+  /** From/to square of the most recent move — public info, shown on both panels. */
+  lastFrom?: boolean;
+  lastTo?: boolean;
   clickable: boolean;
   /** Setup phase only: cursor sits on this square but it's outside the
    * placing side's home rows — show a red X so the player knows a piece
@@ -29,6 +32,8 @@ export function Square({
   panelSide,
   selected,
   legalTarget,
+  lastFrom,
+  lastTo,
   clickable,
   notAllowed,
   combat,
@@ -43,6 +48,8 @@ export function Square({
   if (square.kind === "Piece") classes.push("square--piece");
   if (selected) classes.push("square--selected");
   if (legalTarget) classes.push("square--legal-target");
+  if (lastFrom) classes.push("square--last-from");
+  if (lastTo) classes.push("square--last-to");
   if (clickable) classes.push("square--clickable");
   if (notAllowed) classes.push("square--not-allowed");
 

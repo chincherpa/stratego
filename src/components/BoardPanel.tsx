@@ -134,6 +134,7 @@ export function BoardPanel({ side, view, status, combat, permanentRevealEnabled,
   const markedSquare = markedPos ? view[markedPos.row][markedPos.col] : null;
   const markedRank = markedSquare && markedSquare.kind === "Piece" ? markedSquare.rank : null;
   const highlightedFrom = isSetupPhase ? markedPos : selectedFrom;
+  const lastMove = status.last_move;
 
   // Drop any in-progress selection once this panel stops being interactive
   // (turn passes on, setup finishes) so a stale mark can't linger.
@@ -248,6 +249,8 @@ export function BoardPanel({ side, view, status, combat, permanentRevealEnabled,
           panelSide={side}
           selected={highlightedFrom !== null && samePos(highlightedFrom, pos)}
           legalTarget={targets.some((t) => samePos(t, pos))}
+          lastFrom={lastMove !== null && lastMove.from_row === pos.row && lastMove.from_col === pos.col}
+          lastTo={lastMove !== null && lastMove.to_row === pos.row && lastMove.to_col === pos.col}
           clickable={interactive}
           notAllowed={notAllowed}
           combat={combat && combat.row === pos.row && combat.col === pos.col ? combat : null}

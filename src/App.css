@@ -614,3 +614,12 @@ button {
 .captured-tray__chip--red {
   border-color: rgba(255, 90, 90, 0.6);
 }
+
+/* --- Last-move highlight (public info, both panels) --- */
+.square--last-from:not(.square--selected) {
+  box-shadow: inset 0 0 0 3px rgba(255, 200, 60, 0.45);
+}
+
+.square--last-to:not(.square--selected) {
+  box-shadow: inset 0 0 0 3px rgba(255, 200, 60, 0.85);
+}
