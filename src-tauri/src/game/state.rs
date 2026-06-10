@@ -99,6 +99,15 @@ pub struct StatusDto {
     pub captured_red: Vec<Rank>,
 }
 
+/// Hin-und-her-Regel bookkeeping: `a → b` was the side's last move, and it
+/// was the `count`-th consecutive hop within the unordered pair {a, b}.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Shuttle {
+    a: Pos,
+    b: Pos,
+    count: u8,
+}
+
 /// Everything `cancel_handoff` ("Ich überlege noch einmal") must restore.
 /// Grows alongside GameState: any per-game field mutated by a cancellable
 /// action belongs in here.
@@ -108,6 +117,8 @@ struct UndoSnapshot {
     last_move: Option<(Pos, Pos)>,
     captured_blue: Vec<Rank>,
     captured_red: Vec<Rank>,
+    shuttle_blue: Option<Shuttle>,
+    shuttle_red: Option<Shuttle>,
 }
 
 pub struct GameState {
@@ -133,6 +144,8 @@ pub struct GameState {
     /// combat reveals both ranks anyway.
     captured_blue: Vec<Rank>,
     captured_red: Vec<Rank>,
+    shuttle_blue: Option<Shuttle>,
+    shuttle_red: Option<Shuttle>,
 }
 
 impl GameState {
@@ -147,6 +160,8 @@ impl GameState {
             last_move: None,
             captured_blue: Vec::new(),
             captured_red: Vec::new(),
+            shuttle_blue: None,
+            shuttle_red: None,
         }
     }
 
@@ -180,6 +195,8 @@ impl GameState {
             last_move: self.last_move,
             captured_blue: self.captured_blue.clone(),
             captured_red: self.captured_red.clone(),
+            shuttle_blue: self.shuttle_blue,
+            shuttle_red: self.shuttle_red,
         });
     }
 
@@ -315,6 +332,10 @@ impl GameState {
         }
         rules::validate_move(&self.board, side, from, to).map_err(ActionError::Move)?;
 
+        if self.violates_two_squares(side, from, to) {
+            return Err(ActionError::Move(MoveError::TwoSquares));
+        }
+
         self.take_snapshot();
 
         let attacker = match self.board.get(from) {
@@ -344,6 +365,7 @@ impl GameState {
         };
 
         self.last_move = Some((from, to));
+        self.track_shuttle(side, from, to);
 
         let flag_captured = matches!(
             combat_result,
@@ -371,6 +393,38 @@ impl GameState {
             self.pending_attack = combat_result.is_some();
         }
         Ok(combat_result)
+    }
+
+    fn shuttle(&self, side: Side) -> &Option<Shuttle> {
+        match side {
+            Side::Blue => &self.shuttle_blue,
+            Side::Red => &self.shuttle_red,
+        }
+    }
+
+    fn shuttle_mut(&mut self, side: Side) -> &mut Option<Shuttle> {
+        match side {
+            Side::Blue => &mut self.shuttle_blue,
+            Side::Red => &mut self.shuttle_red,
+        }
+    }
+
+    /// Hin-und-her-Regel: the move is the fourth consecutive hop within the
+    /// same square pair. After `a → b` the piece sits on `b`, so the only
+    /// possible continuation of the shuttle is the exact reverse `b → a`.
+    fn violates_two_squares(&self, side: Side, from: Pos, to: Pos) -> bool {
+        matches!(self.shuttle(side), Some(s) if s.b == from && s.a == to && s.count >= 3)
+    }
+
+    /// Records the executed move: reverse hop extends the streak, anything
+    /// else starts a fresh pair at count 1.
+    fn track_shuttle(&mut self, side: Side, from: Pos, to: Pos) {
+        let slot = self.shuttle_mut(side);
+        let count = match *slot {
+            Some(s) if s.b == from && s.a == to => s.count + 1,
+            _ => 1,
+        };
+        *slot = Some(Shuttle { a: from, b: to, count });
     }
 
     fn record_loss(&mut self, side: Side, rank: Rank) {
@@ -437,6 +491,8 @@ impl GameState {
             self.last_move = snapshot.last_move;
             self.captured_blue = snapshot.captured_blue;
             self.captured_red = snapshot.captured_red;
+            self.shuttle_blue = snapshot.shuttle_blue;
+            self.shuttle_red = snapshot.shuttle_red;
         }
         self.pending_transition = None;
         Ok(acting_side)
@@ -594,5 +650,66 @@ mod tests {
         move_and_confirm(&mut gs, Side::Blue, (9, 0), (8, 0));
         assert!(gs.captured_blue.is_empty());
         assert!(gs.captured_red.is_empty());
+    }
+
+    #[test]
+    fn two_squares_rule_blocks_fourth_hop() {
+        let mut gs = two_movers();
+        move_and_confirm(&mut gs, Side::Blue, (9, 0), (8, 0)); // hop 1
+        move_and_confirm(&mut gs, Side::Red, (0, 0), (1, 0));
+        move_and_confirm(&mut gs, Side::Blue, (8, 0), (9, 0)); // hop 2
+        move_and_confirm(&mut gs, Side::Red, (1, 0), (0, 0));
+        move_and_confirm(&mut gs, Side::Blue, (9, 0), (8, 0)); // hop 3 — still legal
+        move_and_confirm(&mut gs, Side::Red, (0, 9), (1, 9));
+        // hop 4 — forbidden
+        assert!(matches!(
+            gs.make_move(Side::Blue, (8, 0), (9, 0)),
+            Err(ActionError::Move(MoveError::TwoSquares))
+        ));
+        // ...and the board is untouched: the piece is still on (8,0).
+        assert!(matches!(gs.board.get((8, 0)), Square::Occupied(p) if p.owner == Side::Blue));
+    }
+
+    #[test]
+    fn two_squares_counter_resets_on_other_move() {
+        let mut gs = two_movers();
+        move_and_confirm(&mut gs, Side::Blue, (9, 0), (8, 0));
+        move_and_confirm(&mut gs, Side::Red, (0, 0), (1, 0));
+        move_and_confirm(&mut gs, Side::Blue, (8, 0), (9, 0));
+        move_and_confirm(&mut gs, Side::Red, (1, 0), (0, 0));
+        move_and_confirm(&mut gs, Side::Blue, (9, 0), (8, 0));
+        move_and_confirm(&mut gs, Side::Red, (0, 9), (1, 9));
+        // Blue moves a DIFFERENT piece — the shuttle counter resets.
+        move_and_confirm(&mut gs, Side::Blue, (9, 9), (8, 9));
+        move_and_confirm(&mut gs, Side::Red, (1, 9), (0, 9));
+        // The previously forbidden hop is legal again.
+        assert!(gs.make_move(Side::Blue, (8, 0), (9, 0)).is_ok());
+    }
+
+    #[test]
+    fn two_squares_rule_applies_to_scout_slides() {
+        // Scout slides count by exact square pair, same as single steps.
+        let mut gs = two_movers();
+        move_and_confirm(&mut gs, Side::Blue, (9, 9), (6, 9)); // hop 1
+        move_and_confirm(&mut gs, Side::Red, (0, 0), (1, 0));
+        move_and_confirm(&mut gs, Side::Blue, (6, 9), (9, 9)); // hop 2
+        move_and_confirm(&mut gs, Side::Red, (1, 0), (0, 0));
+        move_and_confirm(&mut gs, Side::Blue, (9, 9), (6, 9)); // hop 3
+        move_and_confirm(&mut gs, Side::Red, (0, 9), (1, 9));
+        assert!(matches!(
+            gs.make_move(Side::Blue, (6, 9), (9, 9)),
+            Err(ActionError::Move(MoveError::TwoSquares))
+        ));
+    }
+
+    #[test]
+    fn cancel_handoff_restores_shuttle_state() {
+        let mut gs = two_movers();
+        move_and_confirm(&mut gs, Side::Blue, (9, 0), (8, 0)); // count 1
+        move_and_confirm(&mut gs, Side::Red, (0, 0), (1, 0));
+        // Blue hops back (count 2) but reconsiders.
+        gs.make_move(Side::Blue, (8, 0), (9, 0)).unwrap();
+        gs.cancel_handoff().unwrap();
+        assert_eq!(gs.shuttle_blue, Some(Shuttle { a: (9, 0), b: (8, 0), count: 1 }));
     }
 }

@@ -14,6 +14,9 @@ pub enum MoveError {
     PathBlocked,
     DestinationIsLake,
     DestinationOccupiedByOwnPiece,
+    /// Hin-und-her-Regel: same piece shuttling between the same two squares
+    /// for a fourth consecutive time. Enforced by GameState (needs history).
+    TwoSquares,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
