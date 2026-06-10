@@ -95,6 +95,8 @@ pub struct StatusDto {
     /// einmal" in that case, since combat outcomes can't be taken back.
     pub pending_attack: bool,
     pub last_move: Option<LastMoveDto>,
+    pub captured_blue: Vec<Rank>,
+    pub captured_red: Vec<Rank>,
 }
 
 /// Everything `cancel_handoff` ("Ich überlege noch einmal") must restore.
@@ -104,6 +106,8 @@ pub struct StatusDto {
 struct UndoSnapshot {
     board: Board,
     last_move: Option<(Pos, Pos)>,
+    captured_blue: Vec<Rank>,
+    captured_red: Vec<Rank>,
 }
 
 pub struct GameState {
@@ -125,6 +129,10 @@ pub struct GameState {
     /// From/to of the most recent executed move, shown to both players
     /// (movement is public information in Stratego).
     last_move: Option<(Pos, Pos)>,
+    /// Ranks each side has LOST, in capture order. Public to both players:
+    /// combat reveals both ranks anyway.
+    captured_blue: Vec<Rank>,
+    captured_red: Vec<Rank>,
 }
 
 impl GameState {
@@ -137,6 +145,8 @@ impl GameState {
             pending_attack: false,
             undo_snapshot: None,
             last_move: None,
+            captured_blue: Vec::new(),
+            captured_red: Vec::new(),
         }
     }
 
@@ -151,6 +161,8 @@ impl GameState {
                 to_row: to.0,
                 to_col: to.1,
             }),
+            captured_blue: self.captured_blue.clone(),
+            captured_red: self.captured_red.clone(),
         }
     }
 
@@ -166,6 +178,8 @@ impl GameState {
         self.undo_snapshot = Some(UndoSnapshot {
             board: self.board.clone(),
             last_move: self.last_move,
+            captured_blue: self.captured_blue.clone(),
+            captured_red: self.captured_red.clone(),
         });
     }
 
@@ -359,19 +373,30 @@ impl GameState {
         Ok(combat_result)
     }
 
+    fn record_loss(&mut self, side: Side, rank: Rank) {
+        match side {
+            Side::Blue => self.captured_blue.push(rank),
+            Side::Red => self.captured_red.push(rank),
+        }
+    }
+
     fn apply_combat(&mut self, from: Pos, to: Pos, mut attacker: Piece, mut defender: Piece, outcome: CombatOutcome) {
         attacker.revealed = true;
         defender.revealed = true;
         match outcome {
             CombatOutcome::AttackerWins | CombatOutcome::FlagCaptured => {
+                self.record_loss(defender.owner, defender.rank);
                 self.board.set(to, Square::Occupied(attacker));
                 self.board.set(from, Square::Empty);
             }
             CombatOutcome::DefenderWins => {
+                self.record_loss(attacker.owner, attacker.rank);
                 self.board.set(to, Square::Occupied(defender));
                 self.board.set(from, Square::Empty);
             }
             CombatOutcome::BothDestroyed => {
+                self.record_loss(attacker.owner, attacker.rank);
+                self.record_loss(defender.owner, defender.rank);
                 self.board.set(to, Square::Empty);
                 self.board.set(from, Square::Empty);
             }
@@ -410,6 +435,8 @@ impl GameState {
         if let Some(snapshot) = self.undo_snapshot.take() {
             self.board = snapshot.board;
             self.last_move = snapshot.last_move;
+            self.captured_blue = snapshot.captured_blue;
+            self.captured_red = snapshot.captured_red;
         }
         self.pending_transition = None;
         Ok(acting_side)
@@ -517,5 +544,55 @@ mod tests {
         assert!(matches!(gs.board.get((9, 0)), Square::Occupied(p) if p.rank == Rank::Miner));
         assert_eq!(gs.board.get((8, 0)), Square::Empty);
         assert_eq!(gs.phase, Phase::Playing(Side::Blue));
+    }
+
+    /// Blue attacker at (5,0), Red defender at (4,0), plus spare movers.
+    fn combat_board(attacker: Rank, defender: Rank) -> GameState {
+        playing_with(&[
+            ((5, 0), Side::Blue, attacker),
+            ((4, 0), Side::Red, defender),
+            ((9, 9), Side::Blue, Rank::Scout),
+            ((0, 9), Side::Red, Rank::Scout),
+        ])
+    }
+
+    #[test]
+    fn attacker_win_records_defender_loss() {
+        let mut gs = combat_board(Rank::Marshal, Rank::Miner);
+        gs.make_move(Side::Blue, (5, 0), (4, 0)).unwrap();
+        assert_eq!(gs.captured_red, vec![Rank::Miner]);
+        assert!(gs.captured_blue.is_empty());
+    }
+
+    #[test]
+    fn defender_win_records_attacker_loss() {
+        let mut gs = combat_board(Rank::Miner, Rank::Marshal);
+        gs.make_move(Side::Blue, (5, 0), (4, 0)).unwrap();
+        assert_eq!(gs.captured_blue, vec![Rank::Miner]);
+        assert!(gs.captured_red.is_empty());
+    }
+
+    #[test]
+    fn mutual_destruction_records_both_losses() {
+        let mut gs = combat_board(Rank::Captain, Rank::Captain);
+        gs.make_move(Side::Blue, (5, 0), (4, 0)).unwrap();
+        assert_eq!(gs.captured_blue, vec![Rank::Captain]);
+        assert_eq!(gs.captured_red, vec![Rank::Captain]);
+    }
+
+    #[test]
+    fn flag_capture_records_flag_loss() {
+        let mut gs = combat_board(Rank::Scout, Rank::Flag);
+        gs.make_move(Side::Blue, (5, 0), (4, 0)).unwrap();
+        assert_eq!(gs.captured_red, vec![Rank::Flag]);
+        assert_eq!(gs.phase, Phase::GameOver(Side::Blue));
+    }
+
+    #[test]
+    fn plain_move_captures_nothing() {
+        let mut gs = two_movers();
+        move_and_confirm(&mut gs, Side::Blue, (9, 0), (8, 0));
+        assert!(gs.captured_blue.is_empty());
+        assert!(gs.captured_red.is_empty());
     }
 }
