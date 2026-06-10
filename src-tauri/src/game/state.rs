@@ -86,6 +86,14 @@ pub struct StatusDto {
     pub pending_attack: bool,
 }
 
+/// Everything `cancel_handoff` ("Ich überlege noch einmal") must restore.
+/// Grows alongside GameState: any per-game field mutated by a cancellable
+/// action belongs in here.
+#[derive(Clone)]
+struct UndoSnapshot {
+    board: Board,
+}
+
 pub struct GameState {
     board: Board,
     phase: Phase,
@@ -99,9 +107,9 @@ pub struct GameState {
     /// opposed to a plain move or finishing setup. Combat can't be undone,
     /// so [`cancel_handoff`](Self::cancel_handoff) refuses while this is set.
     pending_attack: bool,
-    /// Board snapshot taken right before the pending action was applied,
+    /// Snapshot taken right before the pending action was applied,
     /// restored verbatim on cancel.
-    undo_snapshot: Option<Board>,
+    undo_snapshot: Option<UndoSnapshot>,
 }
 
 impl GameState {
@@ -130,6 +138,12 @@ impl GameState {
             .iter()
             .map(|row| row.iter().map(|&sq| square_view(sq, viewer, self.phase)).collect())
             .collect()
+    }
+
+    fn take_snapshot(&mut self) {
+        self.undo_snapshot = Some(UndoSnapshot {
+            board: self.board.clone(),
+        });
     }
 
     fn expect_no_pending(&self) -> Result<(), ActionError> {
@@ -250,7 +264,7 @@ impl GameState {
         if !rules::setup_complete(&self.board, side) {
             return Err(ActionError::SetupIncomplete);
         }
-        self.undo_snapshot = Some(self.board.clone());
+        self.take_snapshot();
         self.pending_transition = Some(next);
         self.pending_handoff = Some(side);
         self.pending_attack = false;
@@ -264,7 +278,7 @@ impl GameState {
         }
         rules::validate_move(&self.board, side, from, to).map_err(ActionError::Move)?;
 
-        self.undo_snapshot = Some(self.board.clone());
+        self.take_snapshot();
 
         let attacker = match self.board.get(from) {
             Square::Occupied(p) => p,
@@ -368,8 +382,8 @@ impl GameState {
             .pending_handoff
             .take()
             .ok_or(ActionError::NoPendingHandoff)?;
-        if let Some(board) = self.undo_snapshot.take() {
-            self.board = board;
+        if let Some(snapshot) = self.undo_snapshot.take() {
+            self.board = snapshot.board;
         }
         self.pending_transition = None;
         Ok(acting_side)
@@ -411,5 +425,53 @@ fn square_view(square: Square, viewer: Side, phase: Phase) -> SquareView {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Builds a GameState already in Playing(Blue) with exactly these pieces.
+    /// Bypasses setup so tests stay deterministic and small.
+    fn playing_with(pieces: &[(Pos, Side, Rank)]) -> GameState {
+        let mut gs = GameState::new();
+        for &(pos, side, rank) in pieces {
+            gs.board.set(pos, Square::Occupied(Piece::new(side, rank)));
+        }
+        gs.phase = Phase::Playing(Side::Blue);
+        gs
+    }
+
+    /// A board where both sides always keep a legal move (no accidental
+    /// stalemate-loss): one Miner and one Scout each, far apart.
+    #[allow(dead_code)]
+    fn two_movers() -> GameState {
+        playing_with(&[
+            ((9, 0), Side::Blue, Rank::Miner),
+            ((9, 9), Side::Blue, Rank::Scout),
+            ((0, 0), Side::Red, Rank::Miner),
+            ((0, 9), Side::Red, Rank::Scout),
+        ])
+    }
+
+    /// Makes a move and clicks through the handoff popup (game-ending moves
+    /// skip the handoff, so confirm only when one is pending).
+    #[allow(dead_code)]
+    fn move_and_confirm(gs: &mut GameState, side: Side, from: Pos, to: Pos) {
+        gs.make_move(side, from, to).expect("move should be legal");
+        if gs.pending_handoff.is_some() {
+            gs.confirm_handoff().expect("confirm_handoff");
+        }
+    }
+
+    #[test]
+    fn cancel_handoff_restores_board() {
+        let mut gs = two_movers();
+        gs.make_move(Side::Blue, (9, 0), (8, 0)).unwrap();
+        gs.cancel_handoff().unwrap();
+        assert!(matches!(gs.board.get((9, 0)), Square::Occupied(p) if p.rank == Rank::Miner));
+        assert_eq!(gs.board.get((8, 0)), Square::Empty);
+        assert_eq!(gs.phase, Phase::Playing(Side::Blue));
     }
 }
