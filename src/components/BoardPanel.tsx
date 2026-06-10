@@ -69,6 +69,16 @@ function samePos(a: Pos, b: Pos): boolean {
   return a.row === b.row && a.col === b.col;
 }
 
+/** Backend errors arrive as Rust Debug strings; translate the ones a player
+ * can actually run into through normal clicking. Everything else (already
+ * prevented by the UI's legal-target filter) stays raw. */
+function describeError(raw: string): string {
+  if (raw.includes("TwoSquares")) {
+    return "Hin-und-her-Regel: Diese Figur darf nicht erneut zwischen denselben Feldern hin- und herziehen.";
+  }
+  return raw;
+}
+
 /** Mirrors backend `Board::home_rows`: the rows where a side may place
  * pieces during setup (Red 0-3, Blue 6-9 in canonical coordinates). */
 const HOME_ROWS: Record<Side, [number, number]> = { Red: [0, 3], Blue: [6, 9] };
@@ -165,7 +175,7 @@ export function BoardPanel({ side, view, status, combat, permanentRevealEnabled,
     try {
       await action();
     } catch (err) {
-      setError(String(err));
+      setError(describeError(String(err)));
     }
   }
 
