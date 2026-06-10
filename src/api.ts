@@ -26,4 +26,5 @@ export const api = {
   makeMove: (side: Side, from: Pos, to: Pos) => invoke<void>("make_move", { side, from, to }),
   confirmHandoff: () => invoke<void>("confirm_handoff"),
   cancelHandoff: () => invoke<void>("cancel_handoff"),
+  newGame: () => invoke<void>("new_game"),
 };

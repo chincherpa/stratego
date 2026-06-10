@@ -74,10 +74,22 @@ export type PhaseDto =
   | { kind: "Playing"; turn: Side }
   | { kind: "GameOver"; winner: Side };
 
+/** Mirrors Rust's LastMoveDto: most recent executed move, public to both. */
+export type LastMove = {
+  from_row: number;
+  from_col: number;
+  to_row: number;
+  to_col: number;
+};
+
 export type StatusDto = {
   phase: PhaseDto;
   pending_handoff: Side | null;
   pending_attack: boolean;
+  last_move: LastMove | null;
+  /** Ranks each side has LOST, in capture order (combat is public info). */
+  captured_blue: Rank[];
+  captured_red: Rank[];
 };
 
 export type Pos = { row: number; col: number };
