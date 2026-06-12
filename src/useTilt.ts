@@ -31,6 +31,10 @@ export function useTilt(): TiltState {
 
     function onMouseMove(e: MouseEvent) {
       if (!dragging.current) return;
+      if (!e.ctrlKey) {
+        dragging.current = false;
+        return;
+      }
       const dx = e.clientX - lastPos.current.x;
       const dy = e.clientY - lastPos.current.y;
       lastPos.current = { x: e.clientX, y: e.clientY };
