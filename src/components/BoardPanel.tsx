@@ -37,6 +37,7 @@ type Props = {
   /** Opens the (shared, global) settings modal — both halves' gear buttons
    * trigger the same dialog so either player can reach it from their seat. */
   onOpenSettings: () => void;
+  isTiltLocked: boolean;
 };
 
 const BOARD_SIZE = 10;
@@ -122,7 +123,7 @@ function toCanonical(side: Side, displayRow: number, displayCol: number): Pos {
   return { row: BOARD_SIZE - 1 - displayRow, col: BOARD_SIZE - 1 - displayCol };
 }
 
-export function BoardPanel({ side, view, status, combat, permanentRevealEnabled, onOpenSettings }: Props) {
+export function BoardPanel({ side, view, status, combat, permanentRevealEnabled, onOpenSettings, isTiltLocked }: Props) {
   const [selectedRank, setSelectedRank] = useState<Rank | null>(null);
   const [selectedFrom, setSelectedFrom] = useState<Pos | null>(null);
   /** Setup-phase only: a piece already on the board, picked up so it can be
@@ -194,6 +195,7 @@ export function BoardPanel({ side, view, status, combat, permanentRevealEnabled,
   }
 
   function handleClick(pos: Pos, square: SquareView) {
+    if (isTiltLocked) return;
     if (!interactive) return;
     setError(null);
 
