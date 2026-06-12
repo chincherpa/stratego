@@ -14,12 +14,16 @@ FIXED: das besiegen einer gegnerischen Figur wird nicht kenntlich gemacht. füge
 
 FIXED: Team Blau wird im Screen von Spieler Rot aktuell in rot dargestellt
 
-pop-up nicht in der mitte
+FIXED: pop-up nicht in der mitte
+
+FIXED: Settings-Button auf beiden Hälften, gleiche Funktion
 
 "nochmal überlegen" macht verlust rückgängig
 
-FIXED: Spielbrett größer
+Spielbrett Größe Schieberegler in settings
 
-FIXED: Settings-Button auf beiden Hälften, gleiche Funktion
+Graveyard "x von y"
+
+winner screen - Board ansehen - dann soll board nicht ausgegraut sein
 
 

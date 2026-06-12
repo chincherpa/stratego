@@ -98,7 +98,7 @@ button {
   flex-direction: column;
   gap: 2px;
   margin: 0 auto;
-  width: min(100%, 640px);
+  width: min(100%, 700px);
   aspect-ratio: 1;
 }
 
