@@ -158,6 +158,17 @@ export function BoardPanel({ side, view, status, combat, permanentRevealEnabled,
     }
   }, [interactive]);
 
+  // Also clear selection when tilt lock engages so a stale mark can't
+  // survive the board tilting away from the active player.
+  useEffect(() => {
+    if (isTiltLocked) {
+      setSelectedFrom(null);
+      setMarkedPos(null);
+      setSelectedRank(null);
+      setHoverPos(null);
+    }
+  }, [isTiltLocked]);
+
   // Auto-advance the setup selection through SETUP_RANK_ORDER: once the
   // current rank's quota is used up (or nothing is picked yet), jump to the
   // next rank still in reserve. Suspended while a placed piece is marked so
@@ -184,6 +195,7 @@ export function BoardPanel({ side, view, status, combat, permanentRevealEnabled,
    * that's the "Bankplatz" — send the piece back to reserve. Otherwise it's
    * the usual pick-a-rank-to-place toggle. */
   function handleTraySelect(rank: Rank) {
+    if (isTiltLocked) return;
     if (markedPos && markedRank === rank) {
       const from = markedPos;
       setMarkedPos(null);
