@@ -58,6 +58,7 @@ button {
   background: #ffffff;
   opacity: 0.55;
   transition: opacity 0.2s ease;
+  perspective: 1200px;
 }
 
 .board-panel--active {
@@ -98,8 +99,10 @@ button {
   flex-direction: column;
   gap: 2px;
   margin: 0 auto;
-  width: min(100%, 640px);
+  width: min(100%, 700px);
   aspect-ratio: 1;
+  transform: rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+  transform-style: preserve-3d;
 }
 
 .board-row {
@@ -658,4 +661,30 @@ button {
 .settings-newgame__buttons {
   display: flex;
   gap: 8px;
+}
+
+/* ── 3D Tilt ──────────────────────────────────────────────────────── */
+
+.board-tilt-active .piece--blue.piece--revealed {
+  box-shadow: 0 6px 0 #1d4ed8, 0 10px 16px rgba(0, 0, 0, 0.6);
+}
+
+.board-tilt-active .piece--red.piece--revealed {
+  box-shadow: 0 6px 0 #991b1b, 0 10px 16px rgba(0, 0, 0, 0.6);
+}
+
+.board-tilt-active .piece--blue.piece--hidden {
+  box-shadow: 0 6px 0 #1e3a8a, 0 10px 16px rgba(0, 0, 0, 0.6);
+}
+
+.board-tilt-active .piece--red.piece--hidden {
+  box-shadow: 0 6px 0 #7f1d1d, 0 10px 16px rgba(0, 0, 0, 0.6);
+}
+
+.board-tilt-locked .square--clickable {
+  cursor: not-allowed;
+}
+
+.board-tilt-locked .square--clickable:hover {
+  outline: none;
 }

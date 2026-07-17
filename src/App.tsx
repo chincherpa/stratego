@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useState } from "react";
 import { api } from "./api";
 import { BoardPanel } from "./components/BoardPanel";
 import { HandoffModal } from "./components/HandoffModal";
@@ -6,12 +6,14 @@ import { SettingsPanel } from "./components/SettingsPanel";
 import { WinnerScreen } from "./components/WinnerScreen";
 import { useGame } from "./useGame";
 import { useSettings } from "./useSettings";
+import { useTilt } from "./useTilt";
 import "./App.css";
 
 function App() {
   const { status, blueView, redView, activeCombat } = useGame();
   const { settings, setHandoffPopupEnabled, setPermanentRevealEnabled } = useSettings();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const { rotX, rotY, isActive, isTiltLocked } = useTilt();
 
   // When the handover popup is disabled, skip the confirmation step entirely —
   // confirm the instant a handoff becomes pending, same as if the player had
@@ -43,7 +45,21 @@ function App() {
           setSettingsOpen(false);
         }}
       />
-      <div className="app__panels">
+      <div
+        className={[
+          "app__panels",
+          isActive ? "board-tilt-active" : "",
+          isTiltLocked ? "board-tilt-locked" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+        style={
+          {
+            "--tilt-x": `${rotX}deg`,
+            "--tilt-y": `${rotY}deg`,
+          } as CSSProperties
+        }
+      >
         <BoardPanel
           side="Blue"
           view={blueView}
@@ -51,6 +67,7 @@ function App() {
           combat={activeCombat}
           permanentRevealEnabled={settings.permanentRevealEnabled}
           onOpenSettings={() => setSettingsOpen(true)}
+          isTiltLocked={isTiltLocked}
         />
         <div className="app__divider" title="Hier den Pappkarton aufkleben" />
         <BoardPanel
@@ -60,6 +77,7 @@ function App() {
           combat={activeCombat}
           permanentRevealEnabled={settings.permanentRevealEnabled}
           onOpenSettings={() => setSettingsOpen(true)}
+          isTiltLocked={isTiltLocked}
         />
       </div>
       {/* Held back until the clash banner finishes — otherwise the popup,

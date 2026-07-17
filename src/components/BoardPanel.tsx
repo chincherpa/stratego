@@ -37,6 +37,7 @@ type Props = {
   /** Opens the (shared, global) settings modal — both halves' gear buttons
    * trigger the same dialog so either player can reach it from their seat. */
   onOpenSettings: () => void;
+  isTiltLocked: boolean;
 };
 
 const BOARD_SIZE = 10;
@@ -122,7 +123,7 @@ function toCanonical(side: Side, displayRow: number, displayCol: number): Pos {
   return { row: BOARD_SIZE - 1 - displayRow, col: BOARD_SIZE - 1 - displayCol };
 }
 
-export function BoardPanel({ side, view, status, combat, permanentRevealEnabled, onOpenSettings }: Props) {
+export function BoardPanel({ side, view, status, combat, permanentRevealEnabled, onOpenSettings, isTiltLocked }: Props) {
   const [selectedRank, setSelectedRank] = useState<Rank | null>(null);
   const [selectedFrom, setSelectedFrom] = useState<Pos | null>(null);
   /** Setup-phase only: a piece already on the board, picked up so it can be
@@ -157,6 +158,17 @@ export function BoardPanel({ side, view, status, combat, permanentRevealEnabled,
     }
   }, [interactive]);
 
+  // Also clear selection when tilt lock engages so a stale mark can't
+  // survive the board tilting away from the active player.
+  useEffect(() => {
+    if (isTiltLocked) {
+      setSelectedFrom(null);
+      setMarkedPos(null);
+      setSelectedRank(null);
+      setHoverPos(null);
+    }
+  }, [isTiltLocked]);
+
   // Auto-advance the setup selection through SETUP_RANK_ORDER: once the
   // current rank's quota is used up (or nothing is picked yet), jump to the
   // next rank still in reserve. Suspended while a placed piece is marked so
@@ -183,6 +195,7 @@ export function BoardPanel({ side, view, status, combat, permanentRevealEnabled,
    * that's the "Bankplatz" — send the piece back to reserve. Otherwise it's
    * the usual pick-a-rank-to-place toggle. */
   function handleTraySelect(rank: Rank) {
+    if (isTiltLocked) return;
     if (markedPos && markedRank === rank) {
       const from = markedPos;
       setMarkedPos(null);
@@ -194,6 +207,7 @@ export function BoardPanel({ side, view, status, combat, permanentRevealEnabled,
   }
 
   function handleClick(pos: Pos, square: SquareView) {
+    if (isTiltLocked) return;
     if (!interactive) return;
     setError(null);
 
