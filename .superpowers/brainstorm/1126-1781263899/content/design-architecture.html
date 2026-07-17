@@ -1,0 +1,63 @@
+<h2>Design — Architektur & Datenfluss</h2>
+<p class="subtitle">Abschnitt 1 von 3 — passt das so?</p>
+
+<div class="section">
+  <h3>Neue & geänderte Dateien</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+    <div style="background:#0f2027;border:1px solid #1e3a5f;border-radius:8px;padding:14px;">
+      <div class="label" style="color:#22d3ee;">NEU</div>
+      <div style="margin-top:8px;font-family:monospace;font-size:0.85rem;color:#e2e8f0;">src/useTilt.ts</div>
+      <div style="margin-top:6px;color:#94a3b8;font-size:0.8rem;">Hook: Tilt-State, Eventlistener, isTiltLocked</div>
+    </div>
+    <div style="background:#0f2027;border:1px solid #3d2a0f;border-radius:8px;padding:14px;">
+      <div class="label" style="color:#fb923c;">GEÄNDERT</div>
+      <div style="margin-top:8px;font-family:monospace;font-size:0.85rem;color:#e2e8f0;line-height:1.8;">
+        src/App.tsx<br>
+        src/components/BoardPanel.tsx<br>
+        src/App.css
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Datenfluss</h3>
+  <div style="background:#0a0f1a;border:1px solid #1e293b;border-radius:8px;padding:20px;font-family:monospace;font-size:0.82rem;line-height:2;color:#e2e8f0;overflow-x:auto;">
+    <span style="color:#22d3ee;">useTilt()</span> <span style="color:#64748b;">← window.mousemove + Ctrl-Key</span><br>
+    <span style="color:#64748b;">  └─ returns: {rotX, rotY, isTiltLocked}</span><br>
+    <br>
+    <span style="color:#a78bfa;">App.tsx</span><br>
+    <span style="color:#64748b;">  ├─ &lt;div style="--tilt-x:20deg; --tilt-y:-15deg"&gt;</span><br>
+    <span style="color:#64748b;">  │     ← CSS-Variablen auf Wrapper-Div</span><br>
+    <span style="color:#64748b;">  ├─ &lt;BoardPanel isTiltLocked={isTiltLocked} /&gt;  ← Blau</span><br>
+    <span style="color:#64748b;">  └─ &lt;BoardPanel isTiltLocked={isTiltLocked} /&gt;  ← Rot</span><br>
+    <br>
+    <span style="color:#34d399;">CSS</span><br>
+    <span style="color:#64748b;">  ├─ .board-grid { transform: rotateX(var(--tilt-x)) rotateY(var(--tilt-y)) }</span><br>
+    <span style="color:#64748b;">  └─ .board-tilt-active .piece → box-shadow Extrusion</span>
+  </div>
+</div>
+
+<div class="section">
+  <h3>useTilt — Verhalten</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px;">
+    <div style="background:#0f2027;border:1px solid #1e3a5f;border-radius:6px;padding:12px;font-size:0.8rem;">
+      <div style="color:#22d3ee;font-weight:700;margin-bottom:6px;">Ctrl + Drag</div>
+      <div style="color:#94a3b8;">Maus-Delta × 0.3 → rotX / rotY ändern<br>Clamp: −45° … +45°</div>
+    </div>
+    <div style="background:#0f2027;border:1px solid #1e3a5f;border-radius:6px;padding:12px;font-size:0.8rem;">
+      <div style="color:#fb923c;font-weight:700;margin-bottom:6px;">Ctrl loslassen</div>
+      <div style="color:#94a3b8;">Eingefroren — Winkel bleibt. Kein Reset.</div>
+    </div>
+    <div style="background:#0f2027;border:1px solid #7f1d1d;border-radius:6px;padding:12px;font-size:0.8rem;">
+      <div style="color:#f87171;font-weight:700;margin-bottom:6px;">Winkel &gt; 30°</div>
+      <div style="color:#94a3b8;">isTiltLocked = true → onClick auf Feldern deaktiviert. Cursor: not-allowed.</div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top:20px;padding:14px;background:#0a1628;border:1px solid #1e3a5f;border-radius:8px;font-size:0.82rem;color:#94a3b8;">
+  <strong style="color:#e2e8f0;">Winkelberechnung für isTiltLocked:</strong><br>
+  <code style="color:#22d3ee;">√(rotX² + rotY²) &gt; 30</code> — euklidische Distanz, nicht Summe.
+  Bei reiner X-Achse: 30° X = locked. Bei 22° X + 22° Y ≈ 31° = auch locked.
+</div>

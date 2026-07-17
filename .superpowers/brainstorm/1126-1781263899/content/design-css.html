@@ -1,0 +1,80 @@
+<h2>Design — CSS 3D</h2>
+<p class="subtitle">Abschnitt 2 von 3 — Brett-Transform & Figuren-Extrusion</p>
+
+<div class="section">
+  <h3>Brett-Perspektive</h3>
+  <div style="background:#0a0f1a;border:1px solid #1e293b;border-radius:8px;padding:16px;font-family:monospace;font-size:0.82rem;color:#e2e8f0;line-height:1.9;">
+    <span style="color:#64748b;">/* Wrapper-Div in App.tsx */</span><br>
+    <span style="color:#a78bfa;">.tilt-root</span> {<br>
+    &nbsp;&nbsp;<span style="color:#22d3ee;">perspective</span>: <span style="color:#fb923c;">1200px</span>;<br>
+    }<br><br>
+    <span style="color:#a78bfa;">.board-grid</span> {<br>
+    &nbsp;&nbsp;<span style="color:#22d3ee;">transform</span>: <span style="color:#fb923c;">rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg))</span>;<br>
+    &nbsp;&nbsp;<span style="color:#22d3ee;">transform-style</span>: <span style="color:#fb923c;">preserve-3d</span>;<br>
+    &nbsp;&nbsp;<span style="color:#64748b;">/* kein transition → eingefroren, kein Snap */</span><br>
+    }
+  </div>
+</div>
+
+<div class="section">
+  <h3>Figuren-Extrusion (nur wenn aktiv)</h3>
+  <div style="background:#0a0f1a;border:1px solid #1e293b;border-radius:8px;padding:16px;font-family:monospace;font-size:0.82rem;color:#e2e8f0;line-height:1.9;">
+    <span style="color:#64748b;">/* Klasse .board-tilt-active auf tilt-root wenn rotX≠0 || rotY≠0 */</span><br><br>
+    <span style="color:#a78bfa;">.board-tilt-active .piece--blue.piece--revealed</span> {<br>
+    &nbsp;&nbsp;<span style="color:#22d3ee;">box-shadow</span>: <span style="color:#fb923c;">0 6px 0 #1d4ed8, 0 10px 16px rgba(0,0,0,0.6)</span>;<br>
+    }<br>
+    <span style="color:#a78bfa;">.board-tilt-active .piece--red.piece--revealed</span> {<br>
+    &nbsp;&nbsp;<span style="color:#22d3ee;">box-shadow</span>: <span style="color:#fb923c;">0 6px 0 #991b1b, 0 10px 16px rgba(0,0,0,0.6)</span>;<br>
+    }<br>
+    <span style="color:#a78bfa;">.board-tilt-active .piece--blue.piece--hidden</span> {<br>
+    &nbsp;&nbsp;<span style="color:#22d3ee;">box-shadow</span>: <span style="color:#fb923c;">0 6px 0 #1e3a8a, 0 10px 16px rgba(0,0,0,0.6)</span>;<br>
+    }<br>
+    <span style="color:#a78bfa;">.board-tilt-active .piece--red.piece--hidden</span> {<br>
+    &nbsp;&nbsp;<span style="color:#22d3ee;">box-shadow</span>: <span style="color:#fb923c;">0 6px 0 #7f1d1d, 0 10px 16px rgba(0,0,0,0.6)</span>;<br>
+    }
+  </div>
+</div>
+
+<div class="section">
+  <h3>Tilt-Lock Feedback</h3>
+  <div style="background:#0a0f1a;border:1px solid #1e293b;border-radius:8px;padding:16px;font-family:monospace;font-size:0.82rem;color:#e2e8f0;line-height:1.9;">
+    <span style="color:#64748b;">/* Wenn isTiltLocked — Klicks gesperrt */</span><br>
+    <span style="color:#a78bfa;">.board-tilt-locked .square--clickable</span> {<br>
+    &nbsp;&nbsp;<span style="color:#22d3ee;">cursor</span>: <span style="color:#fb923c;">not-allowed</span>;<br>
+    &nbsp;&nbsp;<span style="color:#22d3ee;">pointer-events</span>: <span style="color:#fb923c;">none</span>;<br>
+    }
+  </div>
+</div>
+
+<div class="section">
+  <h3>Live-Preview des Effekts</h3>
+  <div style="display:flex;gap:24px;justify-content:center;padding:20px;background:#1a1a2e;border-radius:8px;">
+
+    <div style="text-align:center;">
+      <div style="color:#64748b;font-size:0.7rem;margin-bottom:8px;">FLACH (0°)</div>
+      <div style="width:56px;height:56px;background:#2563eb;border-radius:6px;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.75rem;margin:0 auto;">M·10</div>
+    </div>
+
+    <div style="text-align:center;">
+      <div style="color:#22d3ee;font-size:0.7rem;margin-bottom:8px;">GEKIPPT (aktiv)</div>
+      <div style="perspective:300px;">
+        <div style="width:56px;height:56px;background:#2563eb;border-radius:6px;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.75rem;box-shadow:0 6px 0 #1d4ed8,0 10px 16px rgba(0,0,0,0.6);transform:rotateX(20deg);">M·10</div>
+      </div>
+    </div>
+
+    <div style="text-align:center;">
+      <div style="color:#f87171;font-size:0.7rem;margin-bottom:8px;">GESPERRT (&gt;30°)</div>
+      <div style="perspective:300px;">
+        <div style="width:56px;height:56px;background:#2563eb;border-radius:6px;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.75rem;box-shadow:0 6px 0 #1d4ed8,0 10px 16px rgba(0,0,0,0.6);transform:rotateX(35deg);opacity:0.6;cursor:not-allowed;">M·10</div>
+      </div>
+    </div>
+
+    <div style="text-align:center;">
+      <div style="color:#fb923c;font-size:0.7rem;margin-bottom:8px;">ROT FIGUR</div>
+      <div style="perspective:300px;">
+        <div style="width:56px;height:56px;background:#dc2626;border-radius:6px;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:0.75rem;box-shadow:0 6px 0 #991b1b,0 10px 16px rgba(0,0,0,0.6);transform:rotateX(20deg);">Sp·1</div>
+      </div>
+    </div>
+
+  </div>
+</div>

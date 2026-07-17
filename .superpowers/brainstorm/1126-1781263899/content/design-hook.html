@@ -1,0 +1,83 @@
+<h2>Design — useTilt Hook & BoardPanel</h2>
+<p class="subtitle">Abschnitt 3 von 3</p>
+
+<div class="section">
+  <h3>useTilt API</h3>
+  <div style="background:#0a0f1a;border:1px solid #1e293b;border-radius:8px;padding:16px;font-family:monospace;font-size:0.82rem;color:#e2e8f0;line-height:1.9;">
+    <span style="color:#64748b;">// src/useTilt.ts</span><br>
+    <span style="color:#22d3ee;">const SENSITIVITY</span> = <span style="color:#fb923c;">0.3</span>; <span style="color:#64748b;">// °/px</span><br>
+    <span style="color:#22d3ee;">const MAX_ANGLE</span> = <span style="color:#fb923c;">45</span>; <span style="color:#64748b;">// clamp</span><br>
+    <span style="color:#22d3ee;">const LOCK_ANGLE</span> = <span style="color:#fb923c;">30</span>; <span style="color:#64748b;">// √(x²+y²) > 30 → locked</span><br><br>
+    <span style="color:#a78bfa;">interface</span> <span style="color:#34d399;">TiltResult</span> {<br>
+    &nbsp;&nbsp;rotX: <span style="color:#fb923c;">number</span>;<br>
+    &nbsp;&nbsp;rotY: <span style="color:#fb923c;">number</span>;<br>
+    &nbsp;&nbsp;isActive: <span style="color:#fb923c;">boolean</span>; <span style="color:#64748b;">// rotX≠0 || rotY≠0</span><br>
+    &nbsp;&nbsp;isTiltLocked: <span style="color:#fb923c;">boolean</span>; <span style="color:#64748b;">// √(x²+y²) > 30</span><br>
+    }
+  </div>
+  <div style="margin-top:10px;color:#94a3b8;font-size:0.82rem;">
+    Listener auf <code>window</code>: <code>mousedown</code> (Ctrl-Check), <code>mousemove</code> (Delta rechnen), <code>mouseup</code> + <code>keyup[Control]</code> (Drag stoppen). State bleibt eingefroren — kein Reset.
+  </div>
+</div>
+
+<div class="section">
+  <h3>App.tsx Integration</h3>
+  <div style="background:#0a0f1a;border:1px solid #1e293b;border-radius:8px;padding:16px;font-family:monospace;font-size:0.82rem;color:#e2e8f0;line-height:1.9;">
+    <span style="color:#a78bfa;">const</span> { rotX, rotY, isActive, isTiltLocked } = <span style="color:#22d3ee;">useTilt</span>();<br><br>
+    &lt;<span style="color:#34d399;">div</span><br>
+    &nbsp;&nbsp;<span style="color:#a78bfa;">className</span>=<span style="color:#fb923c;">{`tilt-root${isActive ? ' board-tilt-active' : ''}${isTiltLocked ? ' board-tilt-locked' : ''}`}</span><br>
+    &nbsp;&nbsp;<span style="color:#a78bfa;">style</span>={{ '--tilt-x': `${rotX}deg`, '--tilt-y': `${rotY}deg` } <span style="color:#a78bfa;">as</span> CSSProperties}<br>
+    &gt;
+  </div>
+</div>
+
+<div class="section">
+  <h3>BoardPanel — Klick-Deaktivierung</h3>
+  <div style="background:#0a0f1a;border:1px solid #1e293b;border-radius:8px;padding:16px;font-family:monospace;font-size:0.82rem;color:#e2e8f0;line-height:1.9;">
+    <span style="color:#64748b;">// Neues Prop in BoardPanel</span><br>
+    <span style="color:#a78bfa;">interface</span> <span style="color:#34d399;">BoardPanelProps</span> { ...; isTiltLocked: <span style="color:#fb923c;">boolean</span>; }<br><br>
+    <span style="color:#64748b;">// In handleClick (Zeile ~185):</span><br>
+    <span style="color:#a78bfa;">function</span> <span style="color:#22d3ee;">handleClick</span>(pos, square) {<br>
+    &nbsp;&nbsp;<span style="color:#a78bfa;">if</span> (isTiltLocked) <span style="color:#a78bfa;">return</span>;<br>
+    &nbsp;&nbsp;<span style="color:#64748b;">// ... rest unverändert</span><br>
+    }
+  </div>
+</div>
+
+<div class="section">
+  <h3>Zusammenfassung aller Änderungen</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;font-size:0.82rem;">
+    <div style="background:#0a1628;border:1px solid #22d3ee33;border-radius:6px;padding:12px;">
+      <div style="color:#22d3ee;font-weight:700;margin-bottom:6px;">src/useTilt.ts <span style="color:#64748b;">(neu)</span></div>
+      <ul style="color:#94a3b8;margin:0;padding-left:16px;line-height:1.7;">
+        <li>State: rotX, rotY</li>
+        <li>window event listeners</li>
+        <li>isTiltLocked berechnen</li>
+      </ul>
+    </div>
+    <div style="background:#0a1628;border:1px solid #fb923c33;border-radius:6px;padding:12px;">
+      <div style="color:#fb923c;font-weight:700;margin-bottom:6px;">src/App.tsx</div>
+      <ul style="color:#94a3b8;margin:0;padding-left:16px;line-height:1.7;">
+        <li>useTilt() aufrufen</li>
+        <li>tilt-root div mit CSS-Vars</li>
+        <li>isTiltLocked an BoardPanels</li>
+      </ul>
+    </div>
+    <div style="background:#0a1628;border:1px solid #fb923c33;border-radius:6px;padding:12px;">
+      <div style="color:#fb923c;font-weight:700;margin-bottom:6px;">src/components/BoardPanel.tsx</div>
+      <ul style="color:#94a3b8;margin:0;padding-left:16px;line-height:1.7;">
+        <li>isTiltLocked Prop</li>
+        <li>handleClick Guard</li>
+      </ul>
+    </div>
+    <div style="background:#0a1628;border:1px solid #fb923c33;border-radius:6px;padding:12px;">
+      <div style="color:#fb923c;font-weight:700;margin-bottom:6px;">src/App.css</div>
+      <ul style="color:#94a3b8;margin:0;padding-left:16px;line-height:1.7;">
+        <li>.tilt-root perspective</li>
+        <li>.board-grid 3D transform</li>
+        <li>.board-tilt-active piece styles</li>
+        <li>.board-tilt-locked cursor</li>
+      </ul>
+    </div>
+  </div>
+</div>

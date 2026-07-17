@@ -1,0 +1,45 @@
+<h2>Kippt jede Hälfte einzeln — oder beide zusammen?</h2>
+<p class="subtitle">Das Spiel hat zwei Hälften: Blau links, Rot rechts. Jeder Spieler sitzt vor seiner Seite.</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#1a1a2e;display:flex;align-items:center;justify-content:center;padding:20px;gap:16px;">
+      <div style="display:flex;gap:8px;align-items:center;">
+        <!-- Blue panel tilted one way -->
+        <div style="perspective:400px;">
+          <div style="width:80px;height:80px;transform:rotateX(20deg) rotateY(15deg);background:linear-gradient(135deg,#1e3a8a,#1d4ed8);border:2px solid #3b82f6;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#93c5fd;font-size:0.65rem;font-weight:700;box-shadow:0 15px 30px rgba(0,0,0,0.6);">BLAU</div>
+        </div>
+        <div style="color:#475569;font-size:1.5rem;">│</div>
+        <!-- Red panel tilted differently -->
+        <div style="perspective:400px;">
+          <div style="width:80px;height:80px;transform:rotateX(10deg) rotateY(-25deg);background:linear-gradient(135deg,#7f1d1d,#dc2626);border:2px solid #ef4444;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#fca5a5;font-size:0.65rem;font-weight:700;box-shadow:0 15px 30px rgba(0,0,0,0.6);">ROT</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Unabhängig (empfohlen)</h3>
+      <p>Jeder Spieler kippt nur seine eigene Hälfte. Blauer Spieler zieht links, roter Spieler zieht rechts — kein Einfluss auf die andere Seite.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#1a1a2e;display:flex;align-items:center;justify-content:center;padding:20px;gap:16px;">
+      <div style="display:flex;gap:8px;align-items:center;">
+        <!-- Both panels tilted the same -->
+        <div style="perspective:400px;">
+          <div style="width:80px;height:80px;transform:rotateX(25deg) rotateY(-15deg);background:linear-gradient(135deg,#1e3a8a,#1d4ed8);border:2px solid #3b82f6;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#93c5fd;font-size:0.65rem;font-weight:700;box-shadow:0 15px 30px rgba(0,0,0,0.6);">BLAU</div>
+        </div>
+        <div style="color:#475569;font-size:1.5rem;">│</div>
+        <div style="perspective:400px;">
+          <div style="width:80px;height:80px;transform:rotateX(25deg) rotateY(-15deg);background:linear-gradient(135deg,#7f1d1d,#dc2626);border:2px solid #ef4444;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#fca5a5;font-size:0.65rem;font-weight:700;box-shadow:0 15px 30px rgba(0,0,0,0.6);">ROT</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Synchron</h3>
+      <p>Beide Hälften kippen immer gemeinsam und gleich. Ctrl+Drag irgendwo auf dem Bildschirm → beide Bretter bewegen sich.</p>
+    </div>
+  </div>
+
+</div>
