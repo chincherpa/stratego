@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, onCombatResolved, onStateChanged } from "./api";
 import type { BoardView, CombatResult, StatusDto } from "./types";
 
@@ -8,25 +8,30 @@ export type GameSnapshot = {
   redView: BoardView | null;
 };
 
-/** How long the clash banner stays up. Lifted up here (rather than into
- * BoardPanel) so App can hold the handoff popup back until it's done —
- * otherwise the popup, which appears the instant `pending_handoff` is set,
- * covers the animation immediately. Must match `combat-banner-pop` in App.css. */
-const COMBAT_BANNER_DURATION_MS = 1600;
-
 /**
  * Single source of truth on the frontend: pulls status + both perspective
  * views from the backend and refreshes whenever it emits "state-changed".
  * Both panels are always rendered, so both views are always fetched —
  * the backend is what enforces who is allowed to see what.
+ *
+ * `combatAnimationMs` is how long a resolved clash stays in `activeCombat`
+ * (0 = animation switched off, nothing is ever set). App holds the handoff
+ * popup back for exactly that window — otherwise the popup, which appears
+ * the instant `pending_handoff` is set, would cover the animation. The CSS
+ * gets the same number as the `--clash-ms` custom property, so there is no
+ * constant to keep in sync by hand.
  */
-export function useGame() {
+export function useGame(combatAnimationMs: number) {
   const [snapshot, setSnapshot] = useState<GameSnapshot>({
     status: null,
     blueView: null,
     redView: null,
   });
   const [activeCombat, setActiveCombat] = useState<CombatResult | null>(null);
+  // Read inside the (once-registered) event listener, so changing the
+  // setting mid-game takes effect without re-subscribing.
+  const durationRef = useRef(combatAnimationMs);
+  durationRef.current = combatAnimationMs;
 
   const refresh = useCallback(async () => {
     const [status, blueView, redView] = await Promise.all([
@@ -47,9 +52,14 @@ export function useGame() {
       unlistenState = fn;
     });
     onCombatResolved((result) => {
-      setActiveCombat(result);
+      const duration = durationRef.current;
       if (bannerTimer) clearTimeout(bannerTimer);
-      bannerTimer = setTimeout(() => setActiveCombat(null), COMBAT_BANNER_DURATION_MS);
+      if (duration <= 0) {
+        setActiveCombat(null);
+        return;
+      }
+      setActiveCombat(result);
+      bannerTimer = setTimeout(() => setActiveCombat(null), duration);
     }).then((fn) => {
       unlistenCombat = fn;
     });

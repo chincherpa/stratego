@@ -1,4 +1,4 @@
-import { CombatBanner } from "./CombatBanner";
+import { ClashAnimation } from "./ClashAnimation";
 import { Piece } from "./Piece";
 import type { CombatResult, SquareView, Side } from "../types";
 
@@ -18,6 +18,16 @@ type Props = {
   notAllowed?: boolean;
   /** Set only on the square where a clash just resolved, for the brief animation window. */
   combat?: CombatResult | null;
+  /** Attack direction in this panel's display orientation — the clash
+   * animation charges the attacker card in along it. */
+  chargeX?: number;
+  chargeY?: number;
+  /** Inward shift of the clash card stack, in square widths (edge squares). */
+  nudgeX?: number;
+  nudgeY?: number;
+  /** Hovering the matching entry in the Zweikampf history lights this
+   * square up, so the player can see where a past clash happened. */
+  logHighlight?: boolean;
   /** When false, enemy pieces that were revealed by past combat are masked
    * back to the hidden card-back look — except the square currently showing
    * the combat banner, which always reveals both ranks regardless. */
@@ -37,6 +47,11 @@ export function Square({
   clickable,
   notAllowed,
   combat,
+  chargeX = 0,
+  chargeY = 0,
+  nudgeX = 0,
+  nudgeY = 0,
+  logHighlight,
   permanentRevealEnabled,
   onClick,
   onMouseEnter,
@@ -52,6 +67,8 @@ export function Square({
   if (lastTo) classes.push("square--last-to");
   if (clickable) classes.push("square--clickable");
   if (notAllowed) classes.push("square--not-allowed");
+  if (logHighlight) classes.push("square--log-highlight");
+  if (combat) classes.push("square--clash");
 
   const maskRevealed =
     !permanentRevealEnabled &&
@@ -70,7 +87,15 @@ export function Square({
       {square.kind === "Piece" && (
         <Piece owner={square.owner} rank={square.rank} own={square.owner === panelSide} forceHidden={maskRevealed} />
       )}
-      {combat && <CombatBanner result={combat} />}
+      {combat && (
+        <ClashAnimation
+          result={combat}
+          chargeX={chargeX}
+          chargeY={chargeY}
+          nudgeX={nudgeX}
+          nudgeY={nudgeY}
+        />
+      )}
     </div>
   );
 }

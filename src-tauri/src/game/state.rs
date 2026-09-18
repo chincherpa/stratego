@@ -65,8 +65,14 @@ impl From<Phase> for PhaseDto {
 
 /// Snapshot of a single combat resolution, sent to the frontend so it can
 /// animate the clash even though the destroyed piece never lands on the board.
+/// The same records accumulate in [`GameState::combat_log`] and ride along in
+/// every `StatusDto`, which is what feeds the per-panel clash history.
 #[derive(Serialize, Clone, Copy, Debug)]
 pub struct CombatResultDto {
+    /// 1-based clash number ("Zweikampf #3").
+    pub index: u32,
+    /// Number of the move that triggered it ("Zug 17").
+    pub move_number: u32,
     pub row: usize,
     pub col: usize,
     pub attacker_owner: Side,
@@ -97,6 +103,11 @@ pub struct StatusDto {
     pub last_move: Option<LastMoveDto>,
     pub captured_blue: Vec<Rank>,
     pub captured_red: Vec<Rank>,
+    /// Every clash so far, oldest first. Public information (combat reveals
+    /// both ranks to both players), so the same list goes to both panels.
+    pub combat_log: Vec<CombatResultDto>,
+    /// Moves executed so far — labels the history entries.
+    pub move_count: u32,
 }
 
 /// Hin-und-her-Regel bookkeeping: `a → b` was the side's last move, and it
@@ -119,6 +130,8 @@ struct UndoSnapshot {
     captured_red: Vec<Rank>,
     shuttle_blue: Option<Shuttle>,
     shuttle_red: Option<Shuttle>,
+    combat_log: Vec<CombatResultDto>,
+    move_count: u32,
 }
 
 pub struct GameState {
@@ -146,6 +159,11 @@ pub struct GameState {
     captured_red: Vec<Rank>,
     shuttle_blue: Option<Shuttle>,
     shuttle_red: Option<Shuttle>,
+    /// Clash history, oldest first — never pruned, so the frontend can show a
+    /// full scrollback of every Zweikampf of the running game.
+    combat_log: Vec<CombatResultDto>,
+    /// Executed-move counter (not reset per side); only used for labelling.
+    move_count: u32,
 }
 
 impl GameState {
@@ -162,6 +180,8 @@ impl GameState {
             captured_red: Vec::new(),
             shuttle_blue: None,
             shuttle_red: None,
+            combat_log: Vec::new(),
+            move_count: 0,
         }
     }
 
@@ -185,6 +205,8 @@ impl GameState {
             }),
             captured_blue: self.captured_blue.clone(),
             captured_red: self.captured_red.clone(),
+            combat_log: self.combat_log.clone(),
+            move_count: self.move_count,
         }
     }
 
@@ -204,6 +226,8 @@ impl GameState {
             captured_red: self.captured_red.clone(),
             shuttle_blue: self.shuttle_blue,
             shuttle_red: self.shuttle_red,
+            combat_log: self.combat_log.clone(),
+            move_count: self.move_count,
         });
     }
 
@@ -275,10 +299,13 @@ impl GameState {
         Ok(())
     }
 
-    /// Clears every piece `side` has on its home rows and re-scatters the
-    /// full set across them at random, so repeated clicks keep reshuffling
-    /// into a fresh layout rather than only filling in whatever's left.
-    pub fn random_setup(&mut self, side: Side) -> Result<(), ActionError> {
+    /// Scatters the side's *unplaced* ranks across its still-empty home
+    /// squares ("Rest zufällig verteilen"): pieces the player already put
+    /// down deliberately stay exactly where they are.
+    ///
+    /// With `reshuffle = true` ("Alles neu mischen") the side's own pieces are
+    /// swept off its home rows first, so the whole army is laid out anew.
+    pub fn random_setup(&mut self, side: Side, reshuffle: bool) -> Result<(), ActionError> {
         self.expect_no_pending()?;
         let expected = match side {
             Side::Blue => Phase::SetupBlue,
@@ -291,9 +318,11 @@ impl GameState {
         let home: Vec<Pos> = Board::home_rows(side)
             .flat_map(|row| (0..super::board::SIZE).map(move |col| (row, col)))
             .collect();
-        for &pos in &home {
-            if matches!(self.board.get(pos), Square::Occupied(p) if p.owner == side) {
-                self.board.set(pos, Square::Empty);
+        if reshuffle {
+            for &pos in &home {
+                if matches!(self.board.get(pos), Square::Occupied(p) if p.owner == side) {
+                    self.board.set(pos, Square::Empty);
+                }
             }
         }
 
@@ -344,6 +373,7 @@ impl GameState {
         }
 
         self.take_snapshot();
+        self.move_count += 1;
 
         let attacker = match self.board.get(from) {
             Square::Occupied(p) => p,
@@ -354,7 +384,9 @@ impl GameState {
             Square::Occupied(defender) => {
                 let outcome = rules::resolve_combat(attacker.rank, defender.rank);
                 self.apply_combat(from, to, attacker, defender, outcome);
-                Some(CombatResultDto {
+                let record = CombatResultDto {
+                    index: self.combat_log.len() as u32 + 1,
+                    move_number: self.move_count,
                     row: to.0,
                     col: to.1,
                     attacker_owner: attacker.owner,
@@ -362,7 +394,9 @@ impl GameState {
                     defender_owner: defender.owner,
                     defender_rank: defender.rank,
                     outcome,
-                })
+                };
+                self.combat_log.push(record);
+                Some(record)
             }
             _ => {
                 self.board.set(to, Square::Occupied(attacker));
@@ -500,6 +534,8 @@ impl GameState {
             self.captured_red = snapshot.captured_red;
             self.shuttle_blue = snapshot.shuttle_blue;
             self.shuttle_red = snapshot.shuttle_red;
+            self.combat_log = snapshot.combat_log;
+            self.move_count = snapshot.move_count;
         }
         self.pending_transition = None;
         Ok(acting_side)
@@ -718,6 +754,50 @@ mod tests {
         gs.make_move(Side::Blue, (8, 0), (9, 0)).unwrap();
         gs.cancel_handoff().unwrap();
         assert_eq!(gs.shuttle_blue, Some(Shuttle { a: (9, 0), b: (8, 0), count: 1 }));
+    }
+
+    #[test]
+    fn combat_log_grows_with_each_clash() {
+        let mut gs = combat_board(Rank::Marshal, Rank::Miner);
+        assert!(gs.status().combat_log.is_empty());
+        move_and_confirm(&mut gs, Side::Blue, (5, 0), (4, 0));
+        let log = gs.status().combat_log;
+        assert_eq!(log.len(), 1);
+        assert_eq!(log[0].index, 1);
+        assert_eq!(log[0].move_number, 1);
+        assert_eq!(log[0].attacker_rank, Rank::Marshal);
+        assert_eq!(log[0].defender_rank, Rank::Miner);
+        assert_eq!((log[0].row, log[0].col), (4, 0));
+    }
+
+    #[test]
+    fn cancel_handoff_restores_combat_log_and_move_count() {
+        let mut gs = two_movers();
+        // A plain move bumps the counter, then gets taken back.
+        gs.make_move(Side::Blue, (9, 0), (8, 0)).unwrap();
+        assert_eq!(gs.status().move_count, 1);
+        gs.cancel_handoff().unwrap();
+        assert_eq!(gs.status().move_count, 0);
+        assert!(gs.status().combat_log.is_empty());
+    }
+
+    #[test]
+    fn random_setup_keeps_already_placed_pieces() {
+        let mut gs = GameState::new();
+        gs.place_piece(Side::Blue, (9, 0), Rank::Flag).unwrap();
+        gs.place_piece(Side::Blue, (9, 1), Rank::Marshal).unwrap();
+        gs.random_setup(Side::Blue, false).unwrap();
+        assert!(matches!(gs.board.get((9, 0)), Square::Occupied(p) if p.rank == Rank::Flag));
+        assert!(matches!(gs.board.get((9, 1)), Square::Occupied(p) if p.rank == Rank::Marshal));
+        assert!(rules::setup_complete(&gs.board, Side::Blue));
+    }
+
+    #[test]
+    fn random_setup_reshuffle_fills_every_home_square() {
+        let mut gs = GameState::new();
+        gs.place_piece(Side::Blue, (9, 0), Rank::Flag).unwrap();
+        gs.random_setup(Side::Blue, true).unwrap();
+        assert!(rules::setup_complete(&gs.board, Side::Blue));
     }
 
     #[test]

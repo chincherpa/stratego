@@ -27,7 +27,7 @@ Use **pnpm**, never npm/yarn (user preference; ignore the `npm run dev` string i
   - `piece.rs` — `Side`, `Rank` (strength table, per-rank counts, `is_static` for Bomb/Flag)
   - `board.rs` — 10×10 `Board`, lake cells, home rows (Red rows 0–3, Blue rows 6–9)
   - `rules.rs` — stateless validation: `validate_move` (orthogonal single step; Scout slides rook-style any distance over empty squares), `validate_placement`, `resolve_combat` (special cases: Spy attacking Marshal wins, Miner attacking Bomb wins, Flag capture ends game), `has_legal_move`
-  - `state.rs` — `GameState`: phase machine `SetupBlue → SetupRed → Playing(side) → GameOver(winner)`, plus the handoff/undo mechanism and `square_view` (per-viewer visibility filter: own pieces show rank, revealed pieces show rank to all, other opponent pieces show as hidden card-back, and during setup the opponent's pieces are *completely invisible*)
+  - `state.rs` — `GameState`: phase machine `SetupBlue → SetupRed → Playing(side) → GameOver(winner)`, plus the handoff/undo mechanism and `square_view` (per-viewer visibility filter: own pieces show rank, revealed pieces show rank to all, other opponent pieces show as hidden card-back, and during setup the opponent's pieces are *completely invisible*). Also keeps `combat_log` (every clash of the game, numbered, shipped in every `StatusDto`) and `move_count`; `random_setup(side, reshuffle)` fills only the empty home squares unless `reshuffle` is set, so "Rest zufällig verteilen" never throws away a placement the player made
 - `commands.rs` — thin `#[tauri::command]` wrappers over `Mutex<GameState>` (`AppState`). Every successful mutation emits the `state-changed` event; combats additionally emit `combat-resolved` with a `CombatResultDto`.
 - `cursor.rs` — uses `enigo` to physically jump the OS mouse cursor to the centre of the half that gains control after a handoff (so a player doesn't reach across the divider).
 - `lib.rs` — registers commands and forces the window borderless-fullscreen in `setup` so the panel divider lands exactly on the physical screen centre (required by both the cardboard divider and the cursor-jump math).
@@ -45,8 +45,10 @@ While a handoff is pending, every other mutating command is rejected (`HandoffPe
 
 - `api.ts` — typed wrappers around `invoke` and the two events; `types.ts` mirrors the Rust DTOs (serde uses `tag: "kind"` for `SquareView`/`PhaseDto` enums).
 - `useGame.ts` — single source of truth: fetches status + **both** board views on every `state-changed` event. Both `BoardPanel`s are always rendered; secrecy is purely the backend's `square_view` filter.
-- `useSettings.ts` — two display preferences persisted in `localStorage` (`handoffPopupEnabled`, `permanentRevealEnabled`). When the handoff popup is disabled, `App.tsx` auto-calls `confirmHandoff` the instant one becomes pending.
-- `App.tsx` holds the handoff modal back while a combat banner is showing. `COMBAT_BANNER_DURATION_MS` in `useGame.ts` must stay in sync with the `combat-banner-pop` animation in `App.css`.
+- `useSettings.ts` — four preferences persisted in `localStorage`: `handoffPopupEnabled`, `permanentRevealEnabled`, `handoffDelaySeconds` (0 = the popup never auto-confirms) and `combatAnimationSeconds` (0 = no clash animation). When the handoff popup is disabled, `App.tsx` auto-calls `confirmHandoff` the instant one becomes pending — but never while a clash is still animating.
+- `App.tsx` holds the handoff modal back while the clash animation is running, and publishes `--clash-ms` on `.app__panels`. Every layer of the animation in `App.css` runs off that one custom property, so there is no duration constant to keep in sync — change the setting and the whole sequence scales.
+- `components/ClashAnimation.tsx` — the Zweikampf animation (charge → impact flash/shockwaves/sparks → shatter → verdict line), anchored on the contested square and rendered on both panels at once. It doubles as the clash report: the destroyed piece never lands on the board, so those two cards are the only place either player sees it.
+- `components/CombatLog.tsx` — scrollable clash history at the bottom of each half, newest first and worded from that panel's side ("Euer Mineur" vs. "Gegner"). The data is public, so both lists hold the same clashes; hovering a row lights the square up on that panel's board.
 
 ### Adding a new command
 

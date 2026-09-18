@@ -4,6 +4,7 @@ import { countOwnByRank, SetupTray } from "./SetupTray";
 import { api } from "../api";
 import { RANK_COUNT, type BoardView, type CombatResult, type Pos, type Rank, type Side, type StatusDto, type SquareView } from "../types";
 import { CapturedTray } from "./CapturedTray";
+import { CombatLog } from "./CombatLog";
 
 /** Setup auto-pick queue: flag first (most critical to place well), then
  * bombs, then combat ranks ascending by strength (Spy·1 … Marshal·10) so
@@ -115,6 +116,35 @@ function legalTargets(view: BoardView, side: Side, from: Pos, rank: Rank | null)
   return targets;
 }
 
+/** Direction the attacker came from, as a unit vector in this panel's
+ * *display* orientation — Red's board is rotated 180°, so both components
+ * flip there. Feeds the clash animation, which charges the attacker card in
+ * from the square its piece actually came from. */
+function chargeVector(side: Side, lastMove: StatusDto["last_move"]): { x: number; y: number } {
+  if (!lastMove) return { x: 0, y: -1 };
+  const flip = side === "Blue" ? 1 : -1;
+  return {
+    x: Math.sign(lastMove.to_col - lastMove.from_col) * flip,
+    y: Math.sign(lastMove.to_row - lastMove.from_row) * flip,
+  };
+}
+
+/** The clash card stack is roughly 4½ squares wide and 1½ high, so on the
+ * outermost cells it would run past the board (and get clipped by the panel).
+ * Shift it back inward by this many square widths; the impact flash, rings
+ * and sparks stay centred on the contested square. */
+function clashNudge(displayRow: number, displayCol: number): { x: number; y: number } {
+  // `reach` = half the stack's size in square widths; a cell centre closer
+  // than that to the border gets pushed in by the difference.
+  const inward = (index: number, reach: number) => {
+    const centre = index + 0.5;
+    if (centre < reach) return reach - centre;
+    if (centre > BOARD_SIZE - reach) return BOARD_SIZE - reach - centre;
+    return 0;
+  };
+  return { x: inward(displayCol, 2.2), y: inward(displayRow, 1) };
+}
+
 /** Blue's home rows sit at the bottom of the canonical board already; Red's
  * panel is rotated 180° so Red's own back rows likewise appear closest to
  * the Red player (mirrors sitting across the board from each other). */
@@ -134,6 +164,9 @@ export function BoardPanel({ side, view, status, combat, permanentRevealEnabled,
   /** Setup phase only: square the cursor currently rests on, so we can mark
    * out-of-home-row squares with a red X while hovering. */
   const [hoverPos, setHoverPos] = useState<Pos | null>(null);
+  /** Square of the Zweikampf history entry the cursor rests on, highlighted
+   * on this panel's board. Purely local to this half. */
+  const [logHoverPos, setLogHoverPos] = useState<Pos | null>(null);
 
   const phase = status.phase;
   const isSetupPhase = phase.kind === "SetupBlue" || phase.kind === "SetupRed";
@@ -146,6 +179,7 @@ export function BoardPanel({ side, view, status, combat, permanentRevealEnabled,
   const markedRank = markedSquare && markedSquare.kind === "Piece" ? markedSquare.rank : null;
   const highlightedFrom = isSetupPhase ? markedPos : selectedFrom;
   const lastMove = status.last_move;
+  const charge = chargeVector(side, lastMove);
 
   // Drop any in-progress selection once this panel stops being interactive
   // (turn passes on, setup finishes) so a stale mark can't linger.
@@ -260,6 +294,7 @@ export function BoardPanel({ side, view, status, combat, permanentRevealEnabled,
     for (let displayCol = 0; displayCol < BOARD_SIZE; displayCol++) {
       const pos = toCanonical(side, displayRow, displayCol);
       const square = view[pos.row][pos.col];
+      const nudge = clashNudge(displayRow, displayCol);
       const notAllowed =
         isSetupPhase &&
         interactive &&
@@ -278,6 +313,11 @@ export function BoardPanel({ side, view, status, combat, permanentRevealEnabled,
           clickable={interactive}
           notAllowed={notAllowed}
           combat={combat && combat.row === pos.row && combat.col === pos.col ? combat : null}
+          chargeX={charge.x}
+          chargeY={charge.y}
+          nudgeX={nudge.x}
+          nudgeY={nudge.y}
+          logHighlight={logHoverPos !== null && samePos(logHoverPos, pos)}
           permanentRevealEnabled={permanentRevealEnabled}
           onClick={() => handleClick(pos, square)}
           onMouseEnter={isSetupPhase && interactive ? () => setHoverPos(pos) : undefined}
@@ -318,23 +358,39 @@ export function BoardPanel({ side, view, status, combat, permanentRevealEnabled,
         <p className="board-panel__status">{describeStatus(status, side)}</p>
       </header>
 
-      <div className="board-grid">{rows}</div>
+      {/* The grid itself takes the hit: a short recoil shake on impact,
+          running on the same `--clash-ms` timeline as the animation. */}
+      <div className={`board-grid ${combat ? "board-grid--clash" : ""}`}>{rows}</div>
 
       {!isSetupPhase && (
-        <CapturedTray capturedBlue={status.captured_blue} capturedRed={status.captured_red} />
+        <>
+          <CapturedTray capturedBlue={status.captured_blue} capturedRed={status.captured_red} />
+          <CombatLog side={side} entries={status.combat_log} onHoverSquare={setLogHoverPos} />
+        </>
       )}
 
       {error && <p className="board-panel__error">{error}</p>}
 
       {isSetupPhase && interactive && (
         <>
-          <button
-            type="button"
-            className="random-setup-button"
-            onClick={() => run(() => api.randomSetup(side))}
-          >
-            Rest zufällig verteilen
-          </button>
+          <div className="random-setup-row">
+            <button
+              type="button"
+              className="random-setup-button"
+              title="Füllt nur die noch leeren Felder — bereits gesetzte Figuren bleiben stehen."
+              onClick={() => run(() => api.randomSetup(side, false))}
+            >
+              Rest zufällig verteilen
+            </button>
+            <button
+              type="button"
+              className="random-setup-button random-setup-button--reshuffle"
+              title="Räumt die eigene Aufstellung ab und würfelt die komplette Armee neu."
+              onClick={() => run(() => api.randomSetup(side, true))}
+            >
+              Alles neu mischen
+            </button>
+          </div>
           <SetupTray
             side={side}
             boardView={view}

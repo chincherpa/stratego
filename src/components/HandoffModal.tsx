@@ -1,24 +1,27 @@
-import { useEffect } from "react";
+import { type CSSProperties, useEffect } from "react";
 import { api } from "../api";
 import type { Side, StatusDto } from "../types";
 
 type Props = {
   status: StatusDto;
+  /** Milliseconds until the handoff goes through on its own. `0` disables
+   * the timer — the players then confirm by hand (setting "Zeit bis zur
+   * Übergabe"). */
+  autoConfirmMs: number;
 };
 
 const TEAM_NAME: Record<Side, string> = { Blue: "Blau", Red: "Rot" };
 const otherSide = (side: Side): Side => (side === "Blue" ? "Red" : "Blue");
-const AUTO_CONFIRM_MS = 3000;
 
-export function HandoffModal({ status }: Props) {
+export function HandoffModal({ status, autoConfirmMs }: Props) {
   const actingSide = status.pending_handoff;
   const cancelDisabled = status.pending_attack;
 
   useEffect(() => {
-    if (!actingSide) return;
-    const timer = setTimeout(() => api.confirmHandoff(), AUTO_CONFIRM_MS);
+    if (!actingSide || autoConfirmMs <= 0) return;
+    const timer = setTimeout(() => api.confirmHandoff(), autoConfirmMs);
     return () => clearTimeout(timer);
-  }, [actingSide]);
+  }, [actingSide, autoConfirmMs]);
 
   if (!actingSide) return null;
 
@@ -46,6 +49,21 @@ export function HandoffModal({ status }: Props) {
             Ich überlege noch einmal
           </button>
         </div>
+        {/* Visible countdown so nobody is surprised by the auto-handover;
+            the bar drains over exactly the configured time. */}
+        {autoConfirmMs > 0 ? (
+          <div className="handoff-modal__timer">
+            <div
+              className="handoff-modal__timer-bar"
+              style={{ "--handoff-ms": `${autoConfirmMs}ms` } as CSSProperties}
+            />
+            <small>Übergabe automatisch nach {(autoConfirmMs / 1000).toFixed(1).replace(".", ",")} s</small>
+          </div>
+        ) : (
+          <div className="handoff-modal__timer">
+            <small>Automatische Übergabe ist aus – bitte bestätigen.</small>
+          </div>
+        )}
       </div>
     </div>
   );

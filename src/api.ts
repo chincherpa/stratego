@@ -21,7 +21,11 @@ export const api = {
   unplacePiece: (side: Side, pos: Pos) => invoke<void>("unplace_piece", { side, pos }),
   repositionPiece: (side: Side, from: Pos, to: Pos) =>
     invoke<void>("reposition_piece", { side, from, to }),
-  randomSetup: (side: Side) => invoke<void>("random_setup", { side }),
+  /** `reshuffle: false` fills only the still-empty home squares and leaves
+   * everything the player already placed untouched; `true` sweeps the own
+   * pieces off first and lays the whole army out anew. */
+  randomSetup: (side: Side, reshuffle: boolean) =>
+    invoke<void>("random_setup", { side, reshuffle }),
   finishSetup: (side: Side) => invoke<void>("finish_setup", { side }),
   makeMove: (side: Side, from: Pos, to: Pos) => invoke<void>("make_move", { side, from, to }),
   confirmHandoff: () => invoke<void>("confirm_handoff"),
