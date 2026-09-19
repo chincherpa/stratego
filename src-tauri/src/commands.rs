@@ -101,13 +101,22 @@ pub fn reposition_piece(
     result
 }
 
+/// `reshuffle = false` only fills the still-empty home squares ("Rest
+/// zufällig verteilen") and leaves placed pieces alone; `true` sweeps the
+/// side's own pieces off first and lays the whole army out anew ("Alles neu
+/// mischen").
 #[tauri::command]
-pub fn random_setup(window: WebviewWindow, state: State<AppState>, side: Side) -> Result<(), String> {
+pub fn random_setup(
+    window: WebviewWindow,
+    state: State<AppState>,
+    side: Side,
+    reshuffle: bool,
+) -> Result<(), String> {
     let result = state
         .0
         .lock()
         .unwrap()
-        .random_setup(side)
+        .random_setup(side, reshuffle)
         .map_err(|e| e.to_string());
     if result.is_ok() {
         notify(&window);

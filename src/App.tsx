@@ -10,18 +10,21 @@ import { useTilt } from "./useTilt";
 import "./App.css";
 
 function App() {
-  const { status, blueView, redView, activeCombat } = useGame();
-  const { settings, setHandoffPopupEnabled, setPermanentRevealEnabled } = useSettings();
+  const { settings, updateSettings } = useSettings();
+  const combatAnimationMs = Math.round(settings.combatAnimationSeconds * 1000);
+  const handoffDelayMs = Math.round(settings.handoffDelaySeconds * 1000);
+  const { status, blueView, redView, activeCombat } = useGame(combatAnimationMs);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { rotX, rotY, isActive, isTiltLocked } = useTilt();
 
   // When the handover popup is disabled, skip the confirmation step entirely —
   // confirm the instant a handoff becomes pending, same as if the player had
   // clicked through immediately (cursor still jumps via the backend command).
+  // `activeCombat` still gates it, so a clash animation is never cut short.
   useEffect(() => {
-    if (settings.handoffPopupEnabled || !status?.pending_handoff) return;
+    if (settings.handoffPopupEnabled || !status?.pending_handoff || activeCombat) return;
     api.confirmHandoff();
-  }, [settings.handoffPopupEnabled, status?.pending_handoff]);
+  }, [settings.handoffPopupEnabled, status?.pending_handoff, activeCombat]);
 
   if (!status || !blueView || !redView) {
     return (
@@ -36,10 +39,8 @@ function App() {
       <SettingsPanel
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
-        handoffPopupEnabled={settings.handoffPopupEnabled}
-        permanentRevealEnabled={settings.permanentRevealEnabled}
-        onToggleHandoffPopup={setHandoffPopupEnabled}
-        onTogglePermanentReveal={setPermanentRevealEnabled}
+        settings={settings}
+        onChange={updateSettings}
         onNewGame={() => {
           api.newGame();
           setSettingsOpen(false);
@@ -57,6 +58,10 @@ function App() {
           {
             "--tilt-x": `${rotX}deg`,
             "--tilt-y": `${rotY}deg`,
+            // Single source of truth for the clash timeline: every layer of
+            // the animation (and the board shake) runs off this value, so
+            // the setting stretches the whole sequence as one.
+            "--clash-ms": `${combatAnimationMs}ms`,
           } as CSSProperties
         }
       >
@@ -80,11 +85,13 @@ function App() {
           isTiltLocked={isTiltLocked}
         />
       </div>
-      {/* Held back until the clash banner finishes — otherwise the popup,
+      {/* Held back until the clash animation finishes — otherwise the popup,
           which appears the instant `pending_handoff` is set, covers it.
           Also gated on the setting: when disabled, the effect above
           auto-confirms instead of ever showing this modal. */}
-      {!activeCombat && settings.handoffPopupEnabled && <HandoffModal status={status} />}
+      {!activeCombat && settings.handoffPopupEnabled && (
+        <HandoffModal status={status} autoConfirmMs={handoffDelayMs} />
+      )}
       <WinnerScreen status={status} />
     </main>
   );

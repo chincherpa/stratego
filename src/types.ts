@@ -46,6 +46,23 @@ export const RANK_LABEL: Record<Rank, string> = {
   Flag: "🚩",
 };
 
+/** Full German rank names — used in the clash animation and the Zweikampf
+ * history, where there's room for more than the compact square label. */
+export const RANK_NAME: Record<Rank, string> = {
+  Marshal: "Marschall",
+  General: "General",
+  Colonel: "Oberst",
+  Major: "Major",
+  Captain: "Hauptmann",
+  Lieutenant: "Leutnant",
+  Sergeant: "Feldwebel",
+  Miner: "Mineur",
+  Scout: "Aufklärer",
+  Spy: "Spion",
+  Bomb: "Bombe",
+  Flag: "Fahne",
+};
+
 export const ALL_RANKS: Rank[] = [
   "Marshal",
   "General",
@@ -90,6 +107,11 @@ export type StatusDto = {
   /** Ranks each side has LOST, in capture order (combat is public info). */
   captured_blue: Rank[];
   captured_red: Rank[];
+  /** Every clash of the running game, oldest first — feeds the history
+   * panel on both halves (combat is public information). */
+  combat_log: CombatResult[];
+  /** Executed moves so far; labels the history entries ("Zug 17"). */
+  move_count: number;
 };
 
 export type Pos = { row: number; col: number };
@@ -100,6 +122,10 @@ export type CombatOutcome = "AttackerWins" | "DefenderWins" | "BothDestroyed" | 
  * the destroyed piece never lands on the board, so the board diff alone
  * wouldn't reveal who it was. */
 export type CombatResult = {
+  /** 1-based clash number ("Zweikampf #3"). */
+  index: number;
+  /** Number of the move that triggered it ("Zug 17"). */
+  move_number: number;
   row: number;
   col: number;
   attacker_owner: Side;
